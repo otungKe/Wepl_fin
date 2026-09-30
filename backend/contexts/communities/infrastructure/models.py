@@ -4,7 +4,8 @@ from django.db.models import Q
 from contexts.tenancy.contract import TenantScope
 from persistence.tenancy import tenant_column
 
-from ..domain.membership import TITLE_MAX, MembershipStatus, Segment
+from ..domain.group import Segment
+from ..domain.membership import TITLE_MAX, MembershipStatus
 
 
 class Group(models.Model):
@@ -14,6 +15,9 @@ class Group(models.Model):
     tenant = tenant_column()
     name = models.CharField(max_length=120)
     segment = models.CharField(max_length=20, choices=[(s, s) for s in Segment], default=Segment.SAVINGS)
+    # The last member sequence handed out. Only ever increases (0006), so a
+    # member code is never allocated twice, whatever happens to memberships.
+    last_member_sequence = models.PositiveIntegerField(default=0, db_default=0)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -33,6 +37,9 @@ class Fund(models.Model):
 
 
 class Membership(models.Model):
+    """Never deleted. Its group, person, code and joining time never change,
+    and its status only goes from active to left (0006)."""
+
     tenant_scope = TenantScope.TENANT_SCOPED
     tenant = tenant_column()
     group = models.ForeignKey(Group, on_delete=models.PROTECT, related_name="memberships")

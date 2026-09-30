@@ -39,6 +39,13 @@ The contexts are tenancy, identity, communities, governance, ledger, custody,
 notifications, audit and shared_kernel. ADR-0002 says what each owns and does
 not own, and each context's `__init__.py` repeats it.
 
+**Keep membership small (ADR-0012).** A membership holds only its group,
+status (ACTIVE → LEFT, final), member code and optional title. Before adding
+a field to it, ask: is this a fact about the person's membership in this
+group, or a fact another context owns? Payments, balances, capabilities,
+notifications, KYC and login are owned elsewhere. Member codes are
+allocated from `Group.last_member_sequence`, never from a count.
+
 ## What the build enforces (`backend/tests/test_architecture.py`)
 
 - **Boundaries.** A context imports another only via `contexts.<x>.public` or

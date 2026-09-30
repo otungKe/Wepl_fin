@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
-from .domain.membership import MembershipStatus, Segment
+from .domain.group import Segment
+from .domain.membership import MembershipStatus
 
 __all__ = ["CommunityError", "FundView", "GroupView", "MembershipView", "MembershipStatus", "Segment"]
 

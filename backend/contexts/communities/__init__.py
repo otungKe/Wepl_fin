@@ -1,8 +1,9 @@
 """Communities context.
 
 Owns: groups (chamas, welfare groups, collections, and any other
-independently governed group), who belongs to them, the optional titles a
-group gives its members, and the funds a group keeps.
+independently governed group), who belongs to them (a membership: group,
+status, a member code that is never reused, and an optional title; ADR-0012),
+and the funds a group keeps.
 
 Does not own: the group's rules, approvals and what each member is allowed
 to do (governance: capabilities, ADR-0011), what anyone is

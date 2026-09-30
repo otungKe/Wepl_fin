@@ -13,6 +13,7 @@
 | [0009](0009-tenancy-with-row-level-security.md) | Multi-tenancy: explicit tenant context, application checks, forced PostgreSQL row-level security | Proposed (implements Harry's decisions) |
 | [0010](0010-tenancy-boundary.md) | Each independently governed group is a tenant; institutions get explicit, scoped, audited relationships | **Accepted** (Harry) |
 | [0011](0011-membership-titles-and-capabilities.md) | Membership, an optional title (a label) and explicit capabilities are separate; a title grants nothing | Proposed (answers Harry's role review) |
+| [0012](0012-membership-is-small.md) | Membership owns only group, status, code and title; Segment describes the group; LEFT is final; member codes are never reused, enforced in PostgreSQL | Proposed (answers Harry's membership review) |
 
 All are **Proposed** until Harry accepts them. Harry's
 [foundational decisions](../architecture/foundational-decisions.md)
