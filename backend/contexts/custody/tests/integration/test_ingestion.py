@@ -177,7 +177,7 @@ class OnboardingAndReportTests(TestCase):
 
     def test_opening_balances_are_checked(self):
         s = Scenario(opening_balance="100.00")
-        other = Scenario("Other", account="777", tenant_id=s.tenant_id)  # same tenant, another group
+        other = Scenario("Other", account="777")  # another group: invisible from s's tenant
         self.enterContext(s.acting())
         with self.assertRaisesMessage(CustodyError, "more than the bank"):
             record_opening_balances(s.ea.id, statement_balance="100", member_balances={s.m[0].id: "200"}, by=s.m[1].id,

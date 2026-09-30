@@ -3,6 +3,7 @@ from django.db import transaction
 
 from contexts.audit.public import record
 from contexts.identity.public import register_person
+from contexts.tenancy.public import require_tenant
 
 from ..contract import CommunityError, FundView, GroupView, MembershipView
 from ..domain.membership import Role, Segment, member_code
@@ -13,7 +14,12 @@ from .queries import fund_view, group_view, membership
 @transaction.atomic  # a group never exists without its first fund
 def create_group(name: str, *, segment: str = Segment.SAVINGS, fund_name: str = "Main fund",
                  currency: str = "KES", actor: str) -> tuple[GroupView, FundView]:
+    """Create the group of the current tenant. A group is a tenant (ADR-0010):
+    provision the tenant first, then create its one group inside it."""
     Segment(segment)
+    require_tenant()
+    if Group.objects.exists():  # row-level security shows only this tenant's group
+        raise CommunityError("This tenant already has its group; each group is its own tenant.")
     group = Group.objects.create(name=name.strip(), segment=segment)
     fund = Fund.objects.create(group=group, name=fund_name, currency=currency)
     record(actor, "group.created", target_type="group", target_id=group.pk, group_id=group.pk,

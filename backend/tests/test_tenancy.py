@@ -6,6 +6,7 @@ from django.db import DatabaseError, connection, transaction
 from django.test import TestCase
 
 from contexts.audit.infrastructure.models import AuditEvent
+from contexts.communities.public import CommunityError, create_group
 from contexts.custody.infrastructure.models import StatementLine
 from contexts.custody.public import CustodyError, attribute_payment
 from contexts.governance.infrastructure.models import Mandate
@@ -122,6 +123,22 @@ class RlsIsolationTests(TestCase):
         self.assertEqual((current_tenant(), database_tenant()), (None, None))
         with self.assertRaisesMessage(TenancyError, "Unknown tenant"), tenant(999999):
             pass
+
+
+class GroupIsTenantTests(TestCase):
+    """ADR-0010: each group is its own tenant, never a partition inside one."""
+
+    def test_a_tenant_holds_exactly_one_group(self):
+        s = Scenario()
+        with s.acting():
+            with self.assertRaisesMessage(CommunityError, "already has its group"):
+                create_group("Second group", actor="test")
+            with self.assertRaisesMessage(DatabaseError, "community_one_group_per_tenant"), transaction.atomic():
+                sql("INSERT INTO communities_group (name, segment, created_at) VALUES ('x', 'savings', now())")
+
+    def test_a_group_cannot_be_created_outside_a_tenant(self):
+        with self.assertRaisesMessage(TenancyError, "needs a tenant context"):
+            create_group("Nowhere", actor="test")
 
 
 class DatabaseShapeTests(TestCase):

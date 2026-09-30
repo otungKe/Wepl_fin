@@ -56,12 +56,6 @@ class ProposalTests(TestCase):
         with self.assertRaisesMessage(GovernanceError, "payment to themselves"):
             decide(big.id, self.chair.id, approve=True)
 
-    def test_voter_from_another_group_is_refused(self):
-        other, _ = create_group("Other", actor="t")
-        outsider = add_member(other.id, msisdn="0712999999", name="X", role=Role.CHAIR, actor="t")
-        with self.assertRaisesMessage(GovernanceError, "not a member of this group"):
-            decide(self.propose().id, outsider.id, approve=True)
-
     def test_repeated_vote_is_idempotent_but_cannot_change(self):
         p = self.propose()
         decide(p.id, self.chair.id, approve=True)

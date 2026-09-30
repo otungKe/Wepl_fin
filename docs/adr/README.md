@@ -10,7 +10,8 @@
 | [0006](0006-custody-detective-control.md) | Pilot custody: groups hold money at I&M; WEPL reconciles and alerts | Proposed |
 | [0007](0007-application-layer-uses-own-orm.md) | Shortcut: application code uses its own context's ORM models directly | Proposed, shortcut |
 | [0008](0008-who-may-act-before-login.md) | Only an active official may correct the books; opening balances need two; simulator refused in production | Proposed |
-| [0009](0009-tenancy-with-row-level-security.md) | Multi-tenancy: explicit tenant context, application checks, forced PostgreSQL row-level security | Proposed (implements Harry's decisions); who the tenant is awaits Harry |
+| [0009](0009-tenancy-with-row-level-security.md) | Multi-tenancy: explicit tenant context, application checks, forced PostgreSQL row-level security | Proposed (implements Harry's decisions) |
+| [0010](0010-tenancy-boundary.md) | Each independently governed group is a tenant; institutions get explicit, scoped, audited relationships | **Accepted** (Harry) |
 
 All are **Proposed** until Harry accepts them. Harry's
 [foundational decisions](../architecture/foundational-decisions.md)

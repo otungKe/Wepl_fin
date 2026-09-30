@@ -54,7 +54,7 @@ class Command(BaseCommand):
         started = timezone.now()
         number = "01" + started.strftime("%y%m%d%H%M%S")
         name = f"Umoja Savings Group {number[-6:]}"
-        tenant_id = provision_tenant(name, actor="operator").id  # one tenant per pilot group (ADR-0009)
+        tenant_id = provision_tenant(name, actor="operator").id  # the group is the tenant (ADR-0010)
         with tenant(tenant_id):
             self.pilot(name, number, started, seed)
         self.isolation(tenant_id, number)
@@ -149,8 +149,8 @@ class Command(BaseCommand):
             self.say(f"{topic:<32} {count}")
 
     def isolation(self, tenant_id, number):
-        self.step("12. Another tenant sees nothing of this group, even with raw SQL")
-        neighbour = provision_tenant("Neighbouring tenant", actor="operator").id
+        self.step("12. Another group (another tenant) sees nothing of this group, even with raw SQL")
+        neighbour = provision_tenant("Neighbouring group", actor="operator").id
         with tenant(neighbour), connection.cursor() as cur:
             for table in ("ledger_journalentry", "custody_statementline", "communities_membership"):
                 cur.execute(f"SELECT count(*) FROM {table}")

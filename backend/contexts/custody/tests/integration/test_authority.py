@@ -18,8 +18,7 @@ N = "0012345678901"
 class CorrectionAuthorityTests(TestCase):
     def setUp(self):
         self.s = Scenario()
-        self.neighbour = Scenario("Neighbour", account="778", tenant_id=self.s.tenant_id)  # same tenant
-        self.foreign = Scenario("Foreign", account="777")  # another tenant
+        self.foreign = Scenario("Foreign", account="777")  # another group, so another tenant
         self.enterContext(self.s.acting())
         bank.deposit(N, "5000", msisdn=self.s.m[0].msisdn, name="CHAIR")
         bank.deposit(N, "700", msisdn="254733999999", name="UNKNOWN")
@@ -46,11 +45,7 @@ class CorrectionAuthorityTests(TestCase):
         Membership.objects.filter(pk=self.s.m[0].id).update(status="left")
         self.refused(lambda: attribute_payment(self.line.pk, self.s.m[4].id, by=self.s.m[0].id), "not an active")
 
-    def test_another_groups_official_cannot_correct(self):
-        self.refused(lambda: attribute_payment(self.line.pk, self.s.m[4].id, by=self.neighbour.m[1].id),
-                     "not a member of this group")
-
-    def test_another_tenants_official_is_not_even_visible(self):
+    def test_another_groups_official_is_not_even_visible(self):
         self.refused(lambda: attribute_payment(self.line.pk, self.s.m[4].id, by=self.foreign.m[1].id),
                      "unknown official")
 

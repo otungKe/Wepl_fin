@@ -27,11 +27,10 @@ PEOPLE = [
 
 class Scenario:
     def __init__(self, name="Umoja Savings Group", *, rules=None, people=PEOPLE, account="0012345678901",
-                 opening_balance="0.00", tenant_id=None):
-        """``tenant_id`` puts this group in an existing tenant; by default each
-        scenario is a tenant of its own, as each pilot group is."""
+                 opening_balance="0.00"):
+        """A group is a tenant (ADR-0010): each scenario provisions its own."""
         from contexts.governance.public import adopt_constitution
-        self.tenant_id = tenant_id or provision_tenant(name, actor="test").id
+        self.tenant_id = provision_tenant(name, actor="test").id
         with self.acting():
             self.group, self.fund = create_group(name, actor="test")
             adopt_constitution(self.group.id, rules or RULES, actor="test")

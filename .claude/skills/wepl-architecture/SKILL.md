@@ -140,10 +140,17 @@ explicit tenant context → application checks → PostgreSQL RLS (forced) → d
 - **Connect as `wepl_app`.** It is not a superuser and has no BYPASSRLS, or
   RLS silently does nothing. The `tenancy.E001` check and a test enforce it.
 - **Group checks stay.** Commands still verify that member, fund, mandate and
-  line belong to one group. Those checks are the only protection between
-  groups in the same tenant (`tests/test_isolation.py`).
-- **Who the tenant is: open question for Harry.** The pilot default is one
-  tenant per group.
+  line belong to one group. They are defence in depth, and they are tested
+  with RLS deliberately widened (`tests/test_isolation.py`).
+- **A group is a tenant (ADR-0010, accepted).**
+  - Exactly one group per tenant: the database refuses a second.
+  - Provision the tenant, then create the group inside it.
+  - Institutions, providers, SACCOs and WEPL-direct *relate to* tenants;
+    they are never tenants by default.
+  - Institution access, when built, is an explicit grant: per tenant, per
+    purpose, audited. It is never `cross_tenant()`.
+  - **Never build "institution = tenant, group = application-only
+    partition".** Changing the boundary needs a new ADR.
 
 ## ADR status
 

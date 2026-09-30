@@ -2,7 +2,8 @@
 
 - **Status:** Proposed. It implements Harry's
   [foundational decisions](../architecture/foundational-decisions.md) 2–10
-  (CONFIRMED, 2026-09-30). **Open question:** who the tenant is.
+  (CONFIRMED, 2026-09-30). Who the tenant is: **each group**, decided by
+  Harry in [ADR-0010](0010-tenancy-boundary.md).
 - **Supersedes in part:** ADR-0005.
 
 ## Context
@@ -122,26 +123,24 @@ NOT NULL tenant (`tests/test_tenancy.py`).
 ### What the application layer still does (decision 5)
 
 **Commands still check group membership, officials and mandates** (ADR-0005,
-ADR-0008). Those checks are the only protection *between groups in the same
-tenant*. `tests/test_isolation.py` tests them with two groups in one tenant,
-so RLS cannot help and the checks must hold on their own.
+ADR-0008). They are defence in depth: `tests/test_isolation.py` widens RLS
+on purpose with a declared cross-tenant operation, and shows the checks
+still refuse to mix groups and write nothing.
 `tests/test_tenancy.py` tests the database layer with two tenants, using raw
 SQL on purpose.
 
 **Across tenants, another tenant's ids are invisible, not "forbidden".** A
 command given one fails the same way as for an unknown id, and writes nothing.
 
-## Open question for Harry: who is the tenant?
+## Who the tenant is (answered by ADR-0010)
 
-The mechanism does not depend on the answer: a tenant is its own record, and
-groups belong to one. **Pilot default (ASSUMPTION): one tenant per group.**
-- `demo_im_pilot` and the test scenarios provision one tenant per group.
-- The database then enforces isolation between groups' money, not just the
-  application.
-- If the tenant should instead be an institution serving many groups (I&M, a
-  SACCO, WEPL-direct), groups are provisioned under a shared tenant. Existing
-  data would need one migration to re-point `tenant_id`. Isolation between
-  groups inside one institution would then rest on the application checks.
+**Each independently governed group is its own tenant** (Harry, ADR-0010).
+- `communities_group.tenant_id` is unique, so a tenant holds exactly one
+  group, and PostgreSQL refuses a second.
+- Onboarding provisions the tenant, then creates the group inside it.
+- Institutions are *relationships* to tenants, never tenants by default.
+  When they are built, their access will be an explicit grant that is
+  per-tenant, per-purpose and audited, not `cross_tenant()`.
 
 ## Alternatives considered
 
@@ -169,7 +168,6 @@ tenant block, and set them back to `DEFERRED` afterwards
 (`tests/test_properties.py`).
 
 **Revisit when any of these happens:**
-- Harry answers the open question;
 - login lands, and the tenant comes from the session's membership;
 - an operator console needs cross-tenant views, and the separate-role
   alternative is reconsidered;

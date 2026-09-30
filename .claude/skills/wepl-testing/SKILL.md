@@ -39,8 +39,7 @@ and a simulated I&M account **through public surfaces only**. Use it rather than
 creating rows by hand.
 
 **Tenant context in tests (ADR-0009).**
-- **Each `Scenario` is its own tenant.** Pass `tenant_id=` to put a second
-  group in the same tenant. Its helpers (`sync`, `approve`, `balance_of`,
+- **Each `Scenario` is its own group, and so its own tenant (ADR-0010).** Its helpers (`sync`, `approve`, `balance_of`,
   `assert_sound`) act inside it.
 - **Direct calls and ORM reads need the context.** Wrap them in
   `with s.acting():`, or call `self.enterContext(s.acting())` at the end of
@@ -48,9 +47,12 @@ creating rows by hand.
 - **Tests without a scenario** use `act_for_new_tenant(self)`.
 - **Build every scenario before entering a context.** Provisioning inside a
   tenant is refused.
-- **Choose the layer you are testing.** Two groups in *one* tenant test the
-  application checks (`tests/test_isolation.py`). Two tenants test row-level
-  security (`tests/test_tenancy.py`).
+- **Choose the layer you are testing.**
+  - Row-level security: act in one scenario's tenant and reach for
+    another's (`tests/test_tenancy.py`).
+  - The application checks underneath: widen RLS with a declared
+    `cross_tenant(...)`, so every row is visible, and show the command
+    still refuses (`tests/test_isolation.py`).
 - **Hypothesis runs many examples in one test method.** Use a `with` block per
   example, not `enterContext`, and fire deferred triggers *outside* the
   tenant block. `SET CONSTRAINTS` inside a released savepoint survives the

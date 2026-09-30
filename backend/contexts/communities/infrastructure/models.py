@@ -8,11 +8,16 @@ from ..domain.membership import MembershipStatus, Role, Segment
 
 
 class Group(models.Model):
+    """An independently governed group: exactly one per tenant (ADR-0010)."""
+
     tenant_scope = TenantScope.TENANT_SCOPED
     tenant = tenant_column()
     name = models.CharField(max_length=120)
     segment = models.CharField(max_length=20, choices=[(s, s) for s in Segment], default=Segment.SAVINGS)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["tenant"], name="community_one_group_per_tenant")]
 
 
 class Fund(models.Model):

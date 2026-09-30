@@ -4,8 +4,8 @@ from ..domain.scope import TenantScope
 
 
 class Tenant(models.Model):
-    """Who a set of tenant-scoped rows belongs to. For the pilot, one tenant
-    per group (ADR-0009)."""
+    """An independently governed data boundary: one group (ADR-0010).
+    Institutions are relationships to tenants, never tenants by default."""
 
     tenant_scope = TenantScope.SYSTEM
     name = models.CharField(max_length=200)
