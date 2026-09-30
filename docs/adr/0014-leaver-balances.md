@@ -1,6 +1,12 @@
 # ADR-0014: Treatment of outstanding balances after membership ends
 
-- **Status:** **Open. Waiting on Harry.** Raised by the membership review
+- **Status:** **Direction decided, details open.**
+  - Harry decided (2026-09-30) that each group chooses, in its constitution
+    at onboarding, between `SHARES_UNTIL_PAID` and `FROZEN_AT_LEAVING`, with
+    no universal behaviour.
+  - The model and the remaining decisions are in
+    [the design](../architecture/design-leaver-balance-policy.md).
+  - Not implemented yet. Raised by the membership review
   (2026-09-30); see
   [the review](../architecture/review-communities-membership.md), sections
   E and F.
@@ -24,7 +30,7 @@
 
 | Option | Consequence |
 |---|---|
-| Each group decides (recommended) | A constitution rule, beside the existing `interest` and `bank_charges` rules. Each group picks at onboarding. |
+| **Each group decides (chosen by Harry)** | A constitution rule, beside the existing `interest` and `bank_charges` rules. Each group picks at onboarding. |
 | Shares until paid | One rule for every group: money in the pool earns and bears charges until the leaver is paid out. |
 | Frozen at leaving | One rule for every group: today's behaviour becomes the written policy. |
 
