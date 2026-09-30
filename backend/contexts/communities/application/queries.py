@@ -5,7 +5,11 @@ from ..infrastructure.models import Fund, Group, Membership
 
 
 def group_view(group_id: int) -> GroupView:
-    g = Group.objects.get(pk=group_id)
+    """Raises CommunityError for an unknown group or, under row-level
+    security, another tenant's: the two are indistinguishable."""
+    g = Group.objects.filter(pk=group_id).first()
+    if g is None:
+        raise CommunityError(f"Unknown group {group_id}.")
     return GroupView(id=g.pk, tenant_id=g.tenant_id, name=g.name)
 
 

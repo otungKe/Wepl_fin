@@ -6,7 +6,9 @@ from .context import cross_tenant
 
 
 def provision_tenant(name: str, *, actor: str) -> TenantView:
-    """Create a tenant. A system operation: no tenant exists yet to act for."""
+    """Create the tenant row for a group being founded. Only
+    ``communities.create_group`` calls this: a tenant without its group cannot
+    commit (ADR-0013). A system operation: no tenant exists yet to act for."""
     with cross_tenant(f"provision tenant {name!r}", actor=actor):
         t = Tenant.objects.create(name=name)
         record(actor, "tenancy.tenant_provisioned", target_type="tenant", target_id=t.pk, data={"name": name})

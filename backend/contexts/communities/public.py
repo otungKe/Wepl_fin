@@ -1,4 +1,6 @@
-from .application.groups import add_member, create_group, leave_group, open_fund, set_title
+from .application.funds import open_fund
+from .application.groups import create_group
+from .application.memberships import add_member, leave_group, set_title
 from .application.queries import fund_view, group_view, members, membership
 from .contract import CommunityError, FundView, GroupView, MembershipStatus, MembershipView
 

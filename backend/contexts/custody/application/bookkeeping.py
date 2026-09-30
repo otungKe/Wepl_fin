@@ -22,7 +22,10 @@ def rules(ea: ExternalAccount) -> ConstitutionRules:
 
 
 def sharing_facts(ea: ExternalAccount) -> tuple[list[int], dict[int, Money]]:
-    """Active member ids and their balances, for anything shared pro rata."""
+    """Who shares interest, bank charges and pro-rata payouts, and their
+    balances. Today: active members only, so a leaver's balance is frozen.
+    That is not yet a decided rule: ADR-0014 is open, and
+    ``LeaverSharingTests`` pins the current behaviour until Harry decides."""
     return [m.id for m in members(ea.group_id)], member_balances(ea.fund_id, ea.currency)
 
 

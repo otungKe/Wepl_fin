@@ -2,10 +2,11 @@ from django.db import connection
 from django.test import TestCase
 from django.utils import timezone
 
+from contexts.communities.public import create_group
 from contexts.notifications.infrastructure.models import OutboxEvent
 from contexts.notifications.infrastructure.notifiers import MemoryNotifier
 from contexts.notifications.public import deliver_pending, notify
-from contexts.tenancy.public import current_tenant, provision_tenant, tenant
+from contexts.tenancy.public import current_tenant, tenant
 
 
 class Flaky(MemoryNotifier):
@@ -25,7 +26,7 @@ class OutboxTests(TestCase):
     and sets each tenant's context itself."""
 
     def setUp(self):
-        self.t = provision_tenant("T", actor="test").id
+        self.t = create_group("T", actor="test").tenant_id  # a group is its own tenant
 
     def queue(self, *args, **kw):
         with tenant(self.t):
@@ -42,7 +43,7 @@ class OutboxTests(TestCase):
 
     def test_the_same_dedupe_key_in_another_tenant_is_a_different_message(self):
         self.queue("t", {"a": 1}, dedupe_key="x")
-        other = provision_tenant("U", actor="test").id
+        other = create_group("U", actor="test").tenant_id
         with tenant(other):
             notify("t", {"a": 2}, dedupe_key="x")
         self.assertEqual(deliver_pending(notifier=MemoryNotifier()), 2)

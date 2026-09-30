@@ -11,7 +11,8 @@ import unittest
 
 from django.db import connection
 
-from contexts.communities.public import CommunityError, add_member, create_group, members
+from contexts.audit.public import history
+from contexts.communities.public import CommunityError, add_member, create_group, leave_group, members, membership
 from contexts.tenancy.public import tenant
 
 JOINERS = 8
@@ -35,6 +36,18 @@ class ConcurrentJoinTests(unittest.TestCase):
         self.assertTrue(all(isinstance(e, CommunityError) for e in errors), errors)
         with tenant(group.tenant_id):
             self.assertEqual([m.code for m in members(group.id)], ["M01"])
+
+    def test_leaving_twice_at_once_ends_the_spell_once(self):
+        group = create_group("Concurrent leave", actor="test")
+        with tenant(group.tenant_id):
+            m = add_member(group.id, msisdn="0798000002", name="Leaver", actor="test")
+        errors = run_together(lambda n: leave_group(m.id, actor="test"), group.tenant_id)
+        self.assertEqual(len(errors), JOINERS - 1)
+        self.assertTrue(all(isinstance(e, CommunityError) for e in errors), errors)
+        with tenant(group.tenant_id):
+            self.assertEqual(membership(m.id).status, "left")
+            left_events = [e for e in history(target_type="membership", target_id=m.id) if e["action"] == "member.left"]
+        self.assertEqual(len(left_events), 1)
 
 
 def run_together(action, tenant_id) -> list[Exception]:

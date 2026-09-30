@@ -31,8 +31,11 @@ In one transaction it:
   the identity literal, but it is a migration across every foreign key to a
   group, for a fact the 1:1 constraint already enforces. That is an
   ASSUMPTION to revisit if the two ids ever cause confusion.
-- `provision_tenant` stays public in tenancy. Outside tests, only group
-  founding calls it.
+- `provision_tenant` stays public in tenancy, but a tenant without its group
+  cannot commit: a deferred check in `communities 0008` refuses it. Only
+  group founding calls it.
+- Only joining a member moves `last_member_sequence` (`communities 0008`):
+  it starts at 0 and cannot be changed by hand, so no code is skipped.
 
 ### 2. Funds are opened separately
 

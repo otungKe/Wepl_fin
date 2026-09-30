@@ -16,7 +16,7 @@ from contexts.ledger.infrastructure.models import JournalEntry
 from contexts.ledger.public import member_balances
 from contexts.tenancy.contract import TenantScope
 from contexts.tenancy.infrastructure.session import database_tenant, role_bypasses_rls
-from contexts.tenancy.public import TenancyError, cross_tenant, current_tenant, tenant
+from contexts.tenancy.public import TenancyError, cross_tenant, current_tenant, provision_tenant, tenant
 from simulators.im_bank import bank
 from tests.scenario import SIGNATORY, Scenario
 
@@ -146,6 +146,13 @@ class GroupIsTenantTests(TestCase):
         with tenant(group.tenant_id):
             self.assertEqual(group_view(group.id).tenant_id, group.tenant_id)
         self.assertNotEqual(create_group("Another", actor="test").tenant_id, group.tenant_id)
+
+    def test_a_tenant_without_its_group_cannot_commit(self):
+        """Provisioning a bare tenant, the "tenant containing a group" shape,
+        is refused by the database when the transaction commits."""
+        provision_tenant("Bare", actor="test")
+        with self.assertRaisesMessage(DatabaseError, "has no group"), connection.cursor() as c:
+            c.execute("SET CONSTRAINTS ALL IMMEDIATE")
 
     def test_a_failed_founding_leaves_no_tenant_behind(self):
         with cross_tenant("count tenants", actor="test"):

@@ -1,5 +1,7 @@
 """A member code is a stable business identifier (ADR-0012): handed out once,
 never freed, never re-pointed."""
+from unittest import mock
+
 from django.db import DatabaseError, transaction
 from django.test import TestCase
 
@@ -23,14 +25,36 @@ class MembershipTests(TestCase):
         with self.assertRaises(DatabaseError), transaction.atomic():
             write()
 
-    def test_codes_come_from_the_groups_counter_not_a_count(self):
+    def test_only_joining_moves_the_counter(self):
         self.assertEqual([self.add(n).code for n in (1, 2)], ["M01", "M02"])
-        Group.objects.filter(pk=self.group.id).update(last_member_sequence=41)
-        self.assertEqual(self.add(3).code, "M42")
+        for value in (0, 1, 3, 41):
+            with self.subTest(value):
+                self.refused_by_the_database(
+                    lambda: Group.objects.filter(pk=self.group.id).update(last_member_sequence=value))
+        self.assertEqual(self.add(3).code, "M03")
 
-    def test_the_counter_never_goes_back(self):
+    def test_a_failed_join_consumes_no_code_and_a_retry_takes_it(self):
         self.add(1)
-        self.refused_by_the_database(lambda: Group.objects.filter(pk=self.group.id).update(last_member_sequence=0))
+        with mock.patch("contexts.communities.application.memberships.record", side_effect=RuntimeError("audit down")):
+            with self.assertRaises(RuntimeError):
+                self.add(2)  # the membership was inserted, then the transaction rolled back
+        self.assertEqual(Group.objects.get(pk=self.group.id).last_member_sequence, 1)
+        self.assertFalse(Membership.objects.filter(member_code="M02").exists())
+        self.assertEqual(self.add(2).code, "M02")  # never committed before, so not a reuse
+        self.assertEqual(self.add(3).code, "M03")
+
+    def test_a_refused_insert_leaves_the_counter_unchanged(self):
+        first = self.add(1)
+        self.refused_by_the_database(lambda: Membership.objects.create(  # a second active spell
+            group_id=self.group.id, person_id=first.person_id, member_code="M02"))
+        self.assertEqual(Group.objects.get(pk=self.group.id).last_member_sequence, 1)
+        self.assertEqual(self.add(2).code, "M02")
+
+    def test_an_unknown_or_foreign_group_is_a_community_error(self):
+        with self.assertRaisesMessage(CommunityError, "Unknown group"):
+            add_member(999999, msisdn="0712000001", name="P", actor="t")
+        with self.assertRaisesMessage(CommunityError, "Unknown group"):
+            open_fund(999999, actor="t")
 
     def test_leaving_keeps_the_code_and_a_returning_member_gets_a_new_one(self):
         first = self.add(1)
@@ -131,7 +155,8 @@ class DatabaseAllocatesCodesTests(TestCase):
         self.assertEqual(Group.objects.get(pk=self.group.id).last_member_sequence, 2)
 
     def test_the_format_the_database_expects_is_the_domains(self):
-        Group.objects.filter(pk=self.group.id).update(last_member_sequence=99)
+        for n in range(2, 100):
+            add_member(self.group.id, msisdn=f"0713{n:06d}", name="P", actor="t")
         self.assertEqual(add_member(self.group.id, msisdn="0712000003", name="P", actor="t").code, "M100")
 
 

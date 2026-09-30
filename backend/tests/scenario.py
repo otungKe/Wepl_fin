@@ -7,7 +7,7 @@ from contexts.custody.public import link_external_account, sync as custody_sync
 from contexts.governance.public import Capability, decide, eligible_approvers, grant, propose_withdrawal, proposal_view
 from contexts.ledger.public import fund_position, member_balances, trial_balance
 from contexts.shared_kernel.money import Money
-from contexts.tenancy.public import provision_tenant, tenant
+from contexts.tenancy.public import tenant
 from simulators.im_bank import bank
 from simulators.im_bank.connector import SimulatorConnector
 
@@ -105,7 +105,9 @@ def act_for_new_group(testcase, name="G"):
 
 
 def act_for_new_tenant(testcase, name="Test tenant") -> int:
-    """Provision a tenant and act for it until the test ends."""
-    tenant_id = provision_tenant(name, actor="test").id
+    """Found a group, which is its own tenant, and act for it until the test
+    ends. For tests that need a tenant but nothing of the group; a tenant
+    without its group cannot commit (communities 0008)."""
+    tenant_id = create_group(name, actor="test").tenant_id
     testcase.enterContext(tenant(tenant_id))
     return tenant_id

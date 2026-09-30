@@ -15,6 +15,7 @@
 | [0011](0011-membership-titles-and-capabilities.md) | Membership, an optional title (a label) and explicit capabilities are separate; a title grants nothing | Proposed (answers Harry's role review) |
 | [0012](0012-membership-is-small.md) | Membership owns only group, status, code and title; Segment describes the group; LEFT is final; member codes are never reused, enforced in PostgreSQL | Proposed (answers Harry's membership review) |
 | [0013](0013-founding-a-group.md) | A group founds its own tenant in one transaction; funds are opened separately; Segment removed; PostgreSQL allocates member codes on every insert | Proposed (follows Harry's application-layer review) |
+| [0014](0014-leaver-balances.md) | Does a leaver's unpaid balance share interest and charges until settled? Today it is frozen by accident; pinned by a test | **Open**: waiting on Harry |
 
 All are **Proposed** until Harry accepts them. Harry's
 [foundational decisions](../architecture/foundational-decisions.md)
