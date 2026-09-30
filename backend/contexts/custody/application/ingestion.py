@@ -69,10 +69,10 @@ def account_for(ea: ExternalAccount, line: StatementLine) -> None:
 
 
 def _deposit(ea, line):
-    group_members = members(ea.group_id)
+    group_members = members(ea.group_id, active_only=False)  # ended spells too: their codes stay theirs
     remembered = dict(PayerMapping.objects.filter(group_id=ea.group_id).values_list("msisdn", "membership_id"))
     member_id = attribute(reference=line.reference, narration=line.narration, payer_msisdn=line.counterparty_msisdn,
-                          members=[MemberFacts(m.id, m.code, m.msisdn) for m in group_members],
+                          members=[MemberFacts(m.id, m.code, m.msisdn, m.is_active) for m in group_members],
                           remembered_payers=remembered)
     draft = accounting.receipt(bk.book(ea), key=f"line:{line.pk}:receipt", line_id=line.pk, amount=bk.amount(line),
                                member_id=member_id)

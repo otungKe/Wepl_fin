@@ -33,7 +33,7 @@ the questions still open with I&M.
    - **deposit.** `domain/attribution.attribute` looks for a member code in the
      reference or narration, then a remembered payer (`PayerMapping`), then
      the member's own number. Otherwise the money goes to `unattributed_in`
-     and a `correct_records` holder is asked once.
+     and a `correct_records` holder is asked once. A code quoted from a membership spell that ended is held, never moved to another spell (ADR-0012).
    - **interest / charge.** Shared pro rata by member balances, or retained,
      per the constitution (`ConstitutionRules.interest` / `bank_charges`).
    - **withdrawal.** `domain/matching.match_outflow`:

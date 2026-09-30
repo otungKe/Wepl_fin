@@ -43,6 +43,38 @@ class MembershipTests(TestCase):
         self.assertEqual([m.code for m in members(self.group.id)], ["M02", "M03"])
         self.assertEqual([m.code for m in members(self.group.id, active_only=False)], ["M01", "M02", "M03"])
 
+    def test_first_membership(self):
+        m = self.add(1, title="Treasurer")
+        self.assertEqual((m.code, m.status, m.title), ("M01", "active", "Treasurer"))
+
+    def test_one_active_spell_per_person(self):
+        first = self.add(1)
+        with self.assertRaisesMessage(CommunityError, "already an active member"):
+            self.add(1)
+        self.refused_by_the_database(lambda: Membership.objects.create(
+            group_id=self.group.id, person_id=first.person_id, member_code="M77"))
+
+    def test_repeated_leaving_and_returning(self):
+        """Every return is a new spell with a new code, for the same person."""
+        spells = []
+        for cycle in range(3):
+            spells.append(self.add(1))
+            self.add(10 + cycle)  # someone else joins in between
+            leave_group(spells[-1].id, actor="t")
+        spells.append(self.add(1))
+        self.assertEqual([s.code for s in spells], ["M01", "M03", "M05", "M07"])
+        self.assertEqual(len({s.id for s in spells}), 4)
+        self.assertEqual({s.person_id for s in spells}, {spells[0].person_id})
+        mine = [m for m in members(self.group.id, active_only=False) if m.person_id == spells[0].person_id]
+        self.assertEqual([(m.code, m.status) for m in mine],
+                         [("M01", "left"), ("M03", "left"), ("M05", "left"), ("M07", "active")])
+
+    def test_a_returning_person_keeps_their_identity_even_under_another_name(self):
+        first = self.add(1)
+        leave_group(first.id, actor="t")
+        back = add_member(self.group.id, msisdn="+254712000001", name="Another spelling", actor="t")
+        self.assertEqual((back.person_id, back.name), (first.person_id, first.name))
+
     def test_leaving_is_final_and_audited(self):
         m = self.add(1)
         leave_group(m.id, actor="t")

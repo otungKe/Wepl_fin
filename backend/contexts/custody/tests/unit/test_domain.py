@@ -34,6 +34,14 @@ class AttributionTests(SimpleTestCase):
         self.assertEqual(self.attr(payer_msisdn="0733000000", remembered_payers={"254733000000": 1}), 1)
         self.assertEqual(self.attr(payer_msisdn="+254712000002"), 2)
 
+    def test_an_ended_spells_code_always_means_that_spell(self):
+        """John was M01, left, and is M03 now. A payment quoting M01 is held for
+        a person to decide; it is never moved to M03 or credited to M01."""
+        ended = [MemberFacts(1, "M01", "254712000001", active=False), MemberFacts(3, "M03", "254712000001")]
+        self.assertIsNone(self.attr(members=ended, reference="M01", payer_msisdn="0712000001"))
+        self.assertEqual(self.attr(members=ended, payer_msisdn="0712000001"), 3)
+        self.assertIsNone(self.attr(members=ended[:1], payer_msisdn="0712000001"))
+
     def test_unknown_or_departed_payer_is_not_guessed(self):
         self.assertIsNone(self.attr(payer_msisdn="0733000000"))
         self.assertIsNone(self.attr(payer_msisdn="0733000000", remembered_payers={"254733000000": 99}))

@@ -80,6 +80,11 @@ creating rows by hand.
   append-only triggers reject TRUNCATE, so `TransactionTestCase`'s flush will
   fail on journal tables. A concurrency suite needs a teardown that drops and
   recreates the test database, or runs in a separate database.
+  The pattern that works (`tests/test_concurrency.py`): a plain
+  `unittest.TestCase` that commits in a tenant of its own, with threads that
+  each enter the tenant and close their connection. Django runs it after its
+  own test cases, and RLS hides its rows from every other tenant. Prove it
+  can fail: remove the lock and watch it go red.
 - **Hypothesis.** Property tests use `hypothesis.extra.django.TestCase`, which
   rolls back per example.
 

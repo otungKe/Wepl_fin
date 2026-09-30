@@ -21,7 +21,7 @@ def group_summary(ea_id: int) -> dict:
     return {
         "group": group_view(ea.group_id).name, "account": f"{ea.institution} {ea.account_number}",
         "position": pos,
-        "members": [{"code": m.code, "name": m.name, "balance": held.get(m.id, Money.zero(ea.currency)).amount}
+        "members": [{"code": m.code, "name": m.name, "status": m.status, "balance": held.get(m.id, Money.zero(ea.currency)).amount}
                     for m in members(ea.group_id, active_only=False)],
         "open_alerts": list(Alert.objects.filter(group_id=ea.group_id, resolved_at__isnull=True).order_by("id")
                             .values("kind", "message")),

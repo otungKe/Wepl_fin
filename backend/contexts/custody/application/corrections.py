@@ -4,6 +4,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from contexts.audit.public import operation, record
+from contexts.communities.public import membership
 from contexts.governance.public import MandateStatus, execute_mandate, mandate
 from contexts.identity.public import Msisdn
 
@@ -39,12 +40,22 @@ def attribute_payment(line_id: int, membership_id: int, *, by: int, remember_pay
         resolution = bk.post_and_resolve(line, draft, Outcome.ATTRIBUTED, membership_id=member.id, actor=actor,
                                          note="Attributed by a corrector")
         payer = Msisdn.try_parse(line.counterparty_msisdn)
-        if remember_payer and payer is not None:
-            PayerMapping.objects.get_or_create(group_id=ea.group_id, msisdn=payer.value,
-                                               defaults={"membership_id": member.id, "confirmed_by": actor})
+        if remember_payer and payer is not None and member.is_active:
+            _remember(ea.group_id, payer.value, member.id, actor)
         record(actor, "custody.payment_attributed", target_type="statement_line", target_id=line.pk,
                group_id=ea.group_id, data={"membership_id": member.id})
         return resolution
+
+
+def _remember(group_id: int, msisdn: str, membership_id: int, actor: str) -> None:
+    """Remember who this payer pays for. A number remembered for a spell that
+    has since ended now means the member's current spell (ADR-0012); one
+    remembered for a current spell is left as it is."""
+    mapping, created = PayerMapping.objects.get_or_create(
+        group_id=group_id, msisdn=msisdn, defaults={"membership_id": membership_id, "confirmed_by": actor})
+    if not created and mapping.membership_id != membership_id and not membership(mapping.membership_id).is_active:
+        mapping.membership_id, mapping.confirmed_by = membership_id, actor
+        mapping.save(update_fields=["membership", "confirmed_by"])
 
 
 @transaction.atomic  # the mandate claim, entry, resolution and alert closure commit together
