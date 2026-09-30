@@ -9,6 +9,7 @@ from contexts.governance.public import (GovernanceError, InvalidTransition, Mand
                                         adopt_constitution, cancel_proposal, decide, execute_mandate,
                                         expire_mandates, propose_withdrawal)
 from contexts.shared_kernel.money import Money
+from tests.scenario import act_for_new_tenant
 
 RULES = {"approvals": [{"up_to": "20000", "approvers": "officials", "required": 2},
                        {"up_to": None, "approvers": "members", "required": 3}]}
@@ -16,6 +17,7 @@ RULES = {"approvals": [{"up_to": "20000", "approvers": "officials", "required": 
 
 class ProposalTests(TestCase):
     def setUp(self):
+        act_for_new_tenant(self)
         self.group, self.fund = create_group("G", actor="t")
         adopt_constitution(self.group.id, RULES, actor="t")
         roles = [Role.CHAIR, Role.TREASURER, Role.SECRETARY, Role.MEMBER, Role.MEMBER]

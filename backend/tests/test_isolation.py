@@ -1,5 +1,7 @@
-"""A group is the data-isolation boundary (ADR-0005): nothing done in one
-group's name may touch another group's money or decisions."""
+"""Application-level isolation between groups (ADR-0005): nothing done in one
+group's name may touch another group's money or decisions. Both groups here
+share a tenant, so row-level security cannot help and these checks must hold
+on their own. Isolation between tenants is tested in test_tenancy.py."""
 from django.test import TestCase
 
 from contexts.custody.infrastructure.models import StatementLine
@@ -13,8 +15,10 @@ from tests.scenario import Scenario
 class CrossGroupTests(TestCase):
     def setUp(self):
         self.a = Scenario("Group A", account="A1")
-        self.b = Scenario("Group B", account="B1", people=[("0722000001", "B1", "chair"), ("0722000002", "B2", "treasurer"),
-                                                          ("0722000003", "B3", "secretary")])
+        self.b = Scenario("Group B", account="B1", tenant_id=self.a.tenant_id,
+                          people=[("0722000001", "B1", "chair"), ("0722000002", "B2", "treasurer"),
+                                  ("0722000003", "B3", "secretary")])
+        self.enterContext(self.a.acting())  # the shared tenant
         for m in self.a.m:
             bank.deposit("A1", "1000", msisdn=m.msisdn, name="X")
         bank.deposit("A1", "50", msisdn="0733000000", name="STRANGER")
@@ -22,7 +26,7 @@ class CrossGroupTests(TestCase):
 
     def test_cannot_attribute_a_payment_to_another_groups_member(self):
         line = StatementLine.objects.get(amount=50)
-        with self.assertRaisesMessage(CustodyError, "another group"):
+        with self.assertRaisesMessage(CustodyError, "not in this group"):
             attribute_payment(line.pk, self.b.m[0].id, by=self.a.m[1].id)
 
     def test_cannot_explain_an_outflow_with_another_groups_mandate(self):

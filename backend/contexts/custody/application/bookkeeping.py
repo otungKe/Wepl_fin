@@ -1,5 +1,5 @@
 """Gathers the facts an accounting decision needs, and records its outcome."""
-from contexts.communities.public import members
+from contexts.communities.public import CommunityError, MembershipView, members, membership
 from contexts.governance.public import ConstitutionRules, current_rules
 from contexts.ledger.public import JournalDraft, member_balances, post_journal
 from contexts.shared_kernel.money import Money
@@ -41,3 +41,15 @@ def post_and_resolve(line: StatementLine, draft: JournalDraft, outcome: Outcome,
     return LineResolution.objects.create(line=line, outcome=outcome, journal_entry_id=entry_id,
                                          membership_id=membership_id, mandate_id=mandate_id, note=note[:255],
                                          actor=actor)
+
+
+def member_of(group_id: int, membership_id: int) -> MembershipView:
+    """The member, if they are in this group. An unknown id and another
+    tenant's id (invisible under row-level security) read the same."""
+    try:
+        m = membership(membership_id)
+    except CommunityError:
+        m = None
+    if m is None or m.group_id != group_id:
+        raise CustodyError("That member is not in this group.")
+    return m

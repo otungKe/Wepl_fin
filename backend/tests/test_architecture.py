@@ -118,3 +118,13 @@ class ContextShapeTests(SimpleTestCase):
                  if any(n.startswith("django.db.models.signals") or n.startswith("django.dispatch")
                         for n in imports(p))]
         self.assertEqual(users, [])
+
+
+class TenancyMechanismTests(SimpleTestCase):
+    def test_only_the_tenancy_context_sets_the_tenant(self):
+        """Decision 8: nothing may quietly widen what row-level security shows."""
+        allowed = {"contexts/tenancy/infrastructure/session.py", "persistence/tenancy.py"}  # setter; policy SQL
+        offenders = [str(p.relative_to(ROOT)) for p in source_files(ROOT)
+                     if str(p.relative_to(ROOT)) not in allowed
+                     and any(k in p.read_text() for k in ("app.tenant_id", "app.cross_tenant", "set_config("))]
+        self.assertEqual(offenders, [])

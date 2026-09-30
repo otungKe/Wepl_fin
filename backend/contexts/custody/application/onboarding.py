@@ -2,7 +2,6 @@ from django.db import transaction
 from django.utils import timezone
 
 from contexts.audit.public import operation, record
-from contexts.communities.public import membership
 from contexts.shared_kernel.money import Money
 
 from ..contract import CustodyError
@@ -31,8 +30,7 @@ def record_opening_balances(ea_id: int, *, statement_balance, member_balances: d
             raise CustodyError("Opening balances must be recorded before any other statement line.")
         signed_off = {}
         for mid, amt in member_balances.items():
-            if membership(mid).group_id != ea.group_id:
-                raise CustodyError("A signed-off member belongs to another group.")
+            bk.member_of(ea.group_id, mid)
             signed_off[mid] = Money.of(amt, ea.currency)
         if balance.is_zero:
             return None

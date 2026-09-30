@@ -3,7 +3,8 @@ name: wepl-security
 description: Who may do what in Wepl_fin. Covers what is enforced today
   (official-only corrections, no self-benefit, maker-checker, votes, group
   isolation, append-only history, boot guards, log redaction), what is not
-  built (login, KYC, operators, tenancy), and the rules to follow when they
+  built (login, KYC, operators), tenant isolation by row-level security,
+  and the rules to follow when they
   land. Use when touching a command that takes `by`, `actor` or a voter,
   settings, logging, notifications, or anything that decides who may act.
 ---
@@ -29,6 +30,8 @@ yet.
 | **No correction in your own favour** (attributing a payment to yourself) | same | same |
 | **Opening balances need two different officials** (maker-checker) | same | same |
 | Nothing done in one group touches another group's money or decisions | application checks (ADR-0005) | `tests/test_isolation.py` |
+| **Tenant isolation by forced PostgreSQL row-level security**; fails closed without a context; cross-tenant access declared and audited | `contexts/tenancy`, `persistence/tenancy.py` (ADR-0009) | `tests/test_tenancy.py` |
+| **The app's database role cannot bypass RLS** | `tenancy.E001` system check | `tests/test_tenancy.py` |
 | Financial and audit history cannot be edited or deleted, even with SQL | PostgreSQL triggers (ADR-0003) | ledger, custody and audit tests |
 | Every business action has an audit record with an operation id | `audit.public.record` / `operation` | throughout |
 | **Refuse to boot** with DEBUG off and the dev secret, or with DEBUG off and the simulated bank | `config/settings.py` | `tests/test_settings_guards.py` |
@@ -56,7 +59,8 @@ yet.
 
 ## What is not built (do not assume it exists)
 
-- **Authentication.** A membership id passed as `by` is trusted as given. It
+- **Authentication.** A membership id passed as `by` is trusted as given
+  (inside the tenant context, which RLS enforces). It
   says *which* member is claimed, not that the caller *is* that member.
   Today that is safe only because there is no HTTP surface (just `/health/`).
   **The first endpoint that accepts a command must take the actor from the
@@ -64,8 +68,8 @@ yet.
 - **Operator (concierge / back-office) identity.** Operators are not members
   and have no account type.
 - **KYC.**
-- **Tenancy.** An open question (ADR-0005). Group isolation is enforced in
-  application code only; there is no row-level security.
+- **User-scoped row security.** People (`identity.Person`) are USER_SCOPED
+  and have no RLS until login gives a user context (ADR-0009).
 - **Rate limiting.**
 
 ## Rules for when login lands
@@ -85,6 +89,9 @@ yet.
   first.
 
 ### Other rules
+
+- **The tenant comes from the session.** Once login lands, the session's
+  membership decides the tenant context, never a request parameter.
 
 - **Staged tokens (borrowed).** A phone-verified but unfinished session may
   only set a PIN. The default permission is "fully active session". Test that

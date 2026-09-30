@@ -33,6 +33,13 @@ class BooksMatchBankProperty(TestCase):
     @given(st.lists(event, min_size=1, max_size=25))
     def test_any_history_reconciles(self, events):
         s = Scenario()
+        with s.acting():  # each example is its own tenant
+            self.run_history(s, events)
+        with connection.cursor() as c:  # fire the deferred balance triggers now, outside any tenant
+            c.execute("SET CONSTRAINTS ALL IMMEDIATE")
+            c.execute("SET CONSTRAINTS ALL DEFERRED")
+
+    def run_history(self, s, events):
         for kind, arg, amount in events:
             available = bank.balance(N).amount
             if kind == "deposit":
@@ -62,5 +69,3 @@ class BooksMatchBankProperty(TestCase):
         executed = Mandate.objects.filter(status="executed")
         self.assertEqual(executed.count(), len(matched))
         self.assertEqual({m.executed_by_line_id for m in executed}, {l["id"] for l in matched})
-        with connection.cursor() as c:  # fire the deferred balance triggers now
-            c.execute("SET CONSTRAINTS ALL IMMEDIATE")

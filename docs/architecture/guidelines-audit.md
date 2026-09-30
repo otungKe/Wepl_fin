@@ -29,7 +29,7 @@ Audited 2026-09-30, against [engineering-guidelines.md](engineering-guidelines.m
 | 20 | Idempotency first-class | Partly: votes, proposals and notifications were not idempotent | Meets: repeated vote is a no-op, `request_key` on proposals, notification dedupe keys, outbox retry |
 | 21 | Providers behind interfaces | Partly | Meets: `Connector` and `Notifier` ports; implementation chosen by settings |
 | 22 | No provider language in the domain | Partly: `bank_txn_id` | Meets: `external_id`, provider detail in `metadata` |
-| 23 | Tenancy is a security boundary | **No** | Partly: group isolation enforced and tested; tenancy model is an open question (ADR-0005) |
+| 23 | Tenancy is a security boundary | **No** | Meets: explicit tenant context, forced RLS on every tenant table, audited cross-tenant access, tested with raw SQL (ADR-0009); who the tenant is awaits Harry |
 | 24 | Authorization is not authentication | Partly | Partly: business authorization is explicit for votes, cancellations and corrections (ADR-0008); authentication not built |
 | 25 | Explicit security rules | Partly | Partly: approval, self-benefit, maker-checker and isolation rules are explicit and tested; boot guards refuse unsafe production settings; see the wepl-security skill |
 | 26 | Reads and writes may differ | Meets | Meets: queries are separate from commands |
@@ -62,7 +62,7 @@ Audited 2026-09-30, against [engineering-guidelines.md](engineering-guidelines.m
 | 53 | Performance keeps integrity | Meets | Meets |
 | 54 | Integrity over convenience | Meets | Meets |
 | 55 | Don't rebuild the old system blindly | Meets | Meets: only the ledger design was carried over, deliberately |
-| 56 | Don't invent requirements | Partly | Meets: unknowns are marked in the ADRs (tenancy, Django version, I&M format, legal) |
+| 56 | Don't invent requirements | Partly | Meets: unknowns are marked in the ADRs (who the tenant is, I&M format, legal) |
 | 57 | Evidence labels | Partly | Meets in the ADRs |
 | 58 | ADRs for disagreements | **No** | Meets: Django 5.2 vs 6.0 recorded in ADR-0001 |
 | 59 | Refactoring preserves behaviour | — | Meets: every earlier test was ported, and the demo output is unchanged |

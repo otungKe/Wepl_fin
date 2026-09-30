@@ -18,7 +18,9 @@ Requirements: Python 3.12 and PostgreSQL 16.
 python3.12 -m venv .venv && . .venv/bin/activate
 pip install -r backend/requirements-dev.txt
 cd backend
-createdb wepl                      # DB_NAME, DB_USER, DB_PASSWORD, DB_HOST, DB_PORT override the defaults
+# The app connects as wepl_app: not a superuser, so row-level security binds it (ADR-0009).
+psql -U postgres -c "CREATE ROLE wepl_app LOGIN PASSWORD 'wepl' CREATEDB NOSUPERUSER NOBYPASSRLS"
+createdb -U postgres -O wepl_app wepl   # DB_NAME, DB_USER, DB_PASSWORD, DB_HOST, DB_PORT override the defaults
 python manage.py migrate
 python manage.py test              # the full suite, against real Postgres
 python manage.py demo_im_pilot     # the scripted I&M demo
@@ -26,7 +28,7 @@ python manage.py demo_im_pilot     # the scripted I&M demo
 
 | Command | What it does |
 |---|---|
-| `python manage.py sync_accounts` | Fetch statements for every linked account, account for them, reconcile |
+| `python manage.py sync_accounts` | For each tenant in turn: fetch statements for its linked accounts, account for them, reconcile |
 | `python manage.py deliver_outbox` | Deliver queued notifications (to the log until an SMS provider is chosen) |
 
 `WEPL_PROPERTY_EXAMPLES=500 python manage.py test tests.test_properties` runs the

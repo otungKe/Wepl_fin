@@ -1,8 +1,11 @@
+from django.db import connection
 from django.test import TestCase
+from django.utils import timezone
 
 from contexts.notifications.infrastructure.models import OutboxEvent
 from contexts.notifications.infrastructure.notifiers import MemoryNotifier
 from contexts.notifications.public import deliver_pending, notify
+from contexts.tenancy.public import current_tenant, provision_tenant, tenant
 
 
 class Flaky(MemoryNotifier):
@@ -18,39 +21,58 @@ class Flaky(MemoryNotifier):
 
 
 class OutboxTests(TestCase):
+    """Messages are queued inside a tenant; the worker runs outside any tenant
+    and sets each tenant's context itself."""
+
+    def setUp(self):
+        self.t = provision_tenant("T", actor="test").id
+
+    def queue(self, *args, **kw):
+        with tenant(self.t):
+            notify(*args, **kw)
+
+    def events(self):
+        with tenant(self.t):
+            return list(OutboxEvent.objects.all())
+
     def test_dedupe_key_prevents_double_messages(self):
-        notify("t", {"a": 1}, dedupe_key="x")
-        notify("t", {"a": 1}, dedupe_key="x")
-        self.assertEqual(OutboxEvent.objects.count(), 1)
+        self.queue("t", {"a": 1}, dedupe_key="x")
+        self.queue("t", {"a": 1}, dedupe_key="x")
+        self.assertEqual(len(self.events()), 1)
+
+    def test_the_same_dedupe_key_in_another_tenant_is_a_different_message(self):
+        self.queue("t", {"a": 1}, dedupe_key="x")
+        other = provision_tenant("U", actor="test").id
+        with tenant(other):
+            notify("t", {"a": 2}, dedupe_key="x")
+        self.assertEqual(deliver_pending(notifier=MemoryNotifier()), 2)
 
     def test_provider_failure_is_retried_not_lost(self):
-        notify("t", {"a": 1})
+        self.queue("t", {"a": 1})
         flaky = Flaky(failures=1)
         self.assertEqual(deliver_pending(notifier=flaky), 0)
-        event = OutboxEvent.objects.get()
-        self.assertIn("timeout", event.last_error)
+        self.assertIn("timeout", self.events()[0].last_error)
         self.assertEqual(deliver_pending(notifier=flaky), 1)
         self.assertEqual(flaky.sent, [("t", {"a": 1})])
         self.assertEqual(deliver_pending(notifier=flaky), 0)  # delivered once only
 
-    def test_provider_is_called_outside_any_transaction(self):
-        from django.db import connection
-
+    def test_provider_is_called_outside_any_transaction_and_any_tenant(self):
         seen = []
 
         class Probe(MemoryNotifier):
             def deliver(self, topic, payload):
-                seen.append(len(connection.atomic_blocks))
+                seen.append((len(connection.atomic_blocks), current_tenant()))
 
-        notify("t", {"a": 1})
+        self.queue("t", {"a": 1})
         baseline = len(connection.atomic_blocks)  # TestCase's own wrapping
         deliver_pending(notifier=Probe())
-        self.assertEqual(seen, [baseline])
+        self.assertEqual(seen, [(baseline, None)])
 
     def test_an_expired_lease_is_reclaimed(self):
-        from django.utils import timezone
-        notify("t", {"a": 1})
-        OutboxEvent.objects.update(claimed_until=timezone.now() + timezone.timedelta(minutes=5), attempts=1)
+        self.queue("t", {"a": 1})
+        with tenant(self.t):
+            OutboxEvent.objects.update(claimed_until=timezone.now() + timezone.timedelta(minutes=5), attempts=1)
         self.assertEqual(deliver_pending(notifier=MemoryNotifier()), 0)  # another worker holds it
-        OutboxEvent.objects.update(claimed_until=timezone.now() - timezone.timedelta(seconds=1))
+        with tenant(self.t):
+            OutboxEvent.objects.update(claimed_until=timezone.now() - timezone.timedelta(seconds=1))
         self.assertEqual(deliver_pending(notifier=MemoryNotifier()), 1)

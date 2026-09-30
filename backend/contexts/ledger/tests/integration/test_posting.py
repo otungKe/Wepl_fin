@@ -8,6 +8,7 @@ from contexts.ledger.infrastructure.models import Account, JournalEntry, Journal
 from contexts.ledger.public import (account_balance, fund_position, member_balances, post_journal, reverse_journal,
                                     trial_balance)
 from contexts.shared_kernel.money import Money
+from tests.scenario import act_for_new_tenant
 
 CASH = AccountKey(1, 1, AccountPurpose.CUSTODY_CASH, external_account_id=9)
 MEMBER = AccountKey(1, 1, AccountPurpose.MEMBER_INTEREST, member_id=5)
@@ -26,6 +27,9 @@ def check_deferred():
 
 
 class PostingTests(TestCase):
+    def setUp(self):
+        act_for_new_tenant(self)
+
     def test_balances_are_derived_by_normal_side(self):
         post_journal(draft())
         self.assertEqual(account_balance(CASH), Money("100"))
@@ -66,6 +70,7 @@ class DatabaseRuleTests(TestCase):
     """Writes that bypass the domain on purpose, to prove PostgreSQL refuses them."""
 
     def setUp(self):
+        act_for_new_tenant(self)
         self.entry = JournalEntry.objects.get(pk=post_journal(draft("base")))
         self.cash, self.member = (Account.objects.get(purpose=p) for p in ("custody_cash", "member_interest"))
 

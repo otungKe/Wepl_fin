@@ -7,6 +7,9 @@ a fund, by a member, and none of those are ever deleted.
 from django.db import models
 from django.db.models import Q
 
+from contexts.tenancy.contract import TenantScope
+from persistence.tenancy import tenant_column
+
 from ..domain.lifecycle import MandateStatus, ProposalStatus
 from ..domain.mandate import Allocation, new_reference
 
@@ -18,6 +21,8 @@ def _choices(enum):
 
 
 class Constitution(models.Model):
+    tenant_scope = TenantScope.TENANT_SCOPED
+    tenant = tenant_column()
     group = models.ForeignKey(GROUP, on_delete=models.PROTECT, related_name="+")
     version = models.PositiveIntegerField()
     rules = models.JSONField()
@@ -29,10 +34,12 @@ class Constitution(models.Model):
 
 
 class Proposal(models.Model):
+    tenant_scope = TenantScope.TENANT_SCOPED
+    tenant = tenant_column()
     group = models.ForeignKey(GROUP, on_delete=models.PROTECT, related_name="+")
     fund = models.ForeignKey(FUND, on_delete=models.PROTECT, related_name="+")
     constitution = models.ForeignKey(Constitution, on_delete=models.PROTECT)
-    request_key = models.CharField(max_length=80, null=True, blank=True, unique=True)
+    request_key = models.CharField(max_length=80, null=True, blank=True)  # unique per tenant
     proposed_by = models.ForeignKey(MEMBERSHIP, on_delete=models.PROTECT, related_name="+")
     amount = models.DecimalField(max_digits=18, decimal_places=2)
     currency = models.CharField(max_length=3, default="KES")
@@ -50,6 +57,7 @@ class Proposal(models.Model):
     class Meta:
         constraints = [
             models.CheckConstraint(condition=Q(amount__gt=0), name="gov_proposal_amount_positive"),
+            models.UniqueConstraint(fields=["tenant", "request_key"], name="gov_proposal_request_key_unique"),
             models.CheckConstraint(condition=Q(allocation="member", charged_member__isnull=False)
                                    | Q(allocation="pro_rata", charged_member__isnull=True),
                                    name="gov_proposal_allocation_consistent"),
@@ -57,6 +65,8 @@ class Proposal(models.Model):
 
 
 class Approval(models.Model):
+    tenant_scope = TenantScope.TENANT_SCOPED
+    tenant = tenant_column()
     proposal = models.ForeignKey(Proposal, on_delete=models.PROTECT, related_name="approvals")
     membership = models.ForeignKey(MEMBERSHIP, on_delete=models.PROTECT, related_name="+")
     approve = models.BooleanField()
@@ -68,6 +78,8 @@ class Approval(models.Model):
 
 
 class Mandate(models.Model):
+    tenant_scope = TenantScope.TENANT_SCOPED
+    tenant = tenant_column()
     proposal = models.OneToOneField(Proposal, on_delete=models.PROTECT, related_name="mandate")
     group = models.ForeignKey(GROUP, on_delete=models.PROTECT, related_name="+")
     fund = models.ForeignKey(FUND, on_delete=models.PROTECT, related_name="+")

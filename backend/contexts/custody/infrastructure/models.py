@@ -11,6 +11,9 @@ a payment was attributed to (communities) and the mandate a payout executed
 from django.db import models
 from django.db.models import Q
 
+from contexts.tenancy.contract import TenantScope
+from persistence.tenancy import tenant_column
+
 from ..domain.resolution import Outcome
 from ..domain.statement import LineKind
 
@@ -20,6 +23,8 @@ GROUP, FUND, MEMBERSHIP, MANDATE = "communities.Group", "communities.Fund", "com
 class ExternalAccount(models.Model):
     """A group's account at a custodian, e.g. an I&M Chama Account."""
 
+    tenant_scope = TenantScope.TENANT_SCOPED
+    tenant = tenant_column()
     group = models.ForeignKey(GROUP, on_delete=models.PROTECT, related_name="+")
     fund = models.ForeignKey(FUND, on_delete=models.PROTECT, related_name="+")
     institution = models.CharField(max_length=40)
@@ -34,6 +39,8 @@ class ExternalAccount(models.Model):
 
 
 class StatementLine(models.Model):
+    tenant_scope = TenantScope.TENANT_SCOPED
+    tenant = tenant_column()
     external_account = models.ForeignKey(ExternalAccount, on_delete=models.PROTECT, related_name="lines")
     external_id = models.CharField(max_length=64, help_text="The custodian's transaction id")
     sequence = models.BigIntegerField(help_text="The custodian's posting order")
@@ -57,6 +64,8 @@ class StatementLine(models.Model):
 
 
 class LineResolution(models.Model):
+    tenant_scope = TenantScope.TENANT_SCOPED
+    tenant = tenant_column()
     line = models.ForeignKey(StatementLine, on_delete=models.PROTECT, related_name="resolutions")
     outcome = models.CharField(max_length=14, choices=[(o.value, o.value) for o in Outcome])
     membership = models.ForeignKey(MEMBERSHIP, null=True, blank=True, on_delete=models.PROTECT, related_name="+")
@@ -70,6 +79,8 @@ class LineResolution(models.Model):
 class PayerMapping(models.Model):
     """Remembers who a payer is, so the treasurer is asked only once."""
 
+    tenant_scope = TenantScope.TENANT_SCOPED
+    tenant = tenant_column()
     group = models.ForeignKey(GROUP, on_delete=models.PROTECT, related_name="+")
     msisdn = models.CharField(max_length=12)
     membership = models.ForeignKey(MEMBERSHIP, on_delete=models.PROTECT, related_name="+")
@@ -81,6 +92,8 @@ class PayerMapping(models.Model):
 
 
 class Alert(models.Model):
+    tenant_scope = TenantScope.TENANT_SCOPED
+    tenant = tenant_column()
     class Kind(models.TextChoices):
         UNMATCHED_OUTFLOW = "unmatched_outflow", "Money left without an approved mandate"
         RECONCILIATION_DIFFERENCE = "recon_difference", "Books and custodian disagree"
@@ -100,6 +113,8 @@ class Alert(models.Model):
 
 
 class ReconciliationRun(models.Model):
+    tenant_scope = TenantScope.TENANT_SCOPED
+    tenant = tenant_column()
     external_account = models.ForeignKey(ExternalAccount, on_delete=models.PROTECT, related_name="reconciliations")
     run_at = models.DateTimeField(auto_now_add=True)
     statement_balance = models.DecimalField(max_digits=18, decimal_places=2, null=True)

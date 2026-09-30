@@ -4,14 +4,10 @@ from django.db import transaction
 from contexts.audit.public import record
 from contexts.identity.public import register_person
 
-from ..contract import FundView, GroupView, MembershipView
+from ..contract import CommunityError, FundView, GroupView, MembershipView
 from ..domain.membership import Role, Segment, member_code
 from ..infrastructure.models import Fund, Group, Membership
 from .queries import fund_view, group_view, membership
-
-
-class CommunityError(ValueError):
-    pass
 
 
 @transaction.atomic  # a group never exists without its first fund

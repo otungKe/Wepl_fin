@@ -19,8 +19,8 @@ jobs:
           --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
     env:
       DB_HOST: localhost
-      DB_USER: postgres
-      DB_PASSWORD: postgres
+      DB_USER: wepl_app  # not a superuser, so row-level security applies (ADR-0009)
+      DB_PASSWORD: wepl
       WEPL_PROPERTY_EXAMPLES: "150"
     steps:
       - uses: actions/checkout@v4
@@ -30,6 +30,12 @@ jobs:
           cache: pip
           cache-dependency-path: backend/requirements-dev.txt
       - run: pip install -r backend/requirements-dev.txt
+      - name: Create the application database role
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -c "CREATE ROLE wepl_app LOGIN PASSWORD 'wepl' CREATEDB NOSUPERUSER NOBYPASSRLS"
+          psql -h localhost -U postgres -c "ALTER DATABASE wepl OWNER TO wepl_app"
       - run: python manage.py makemigrations --check --dry-run
         working-directory: backend
       - run: python manage.py test -v 2

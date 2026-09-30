@@ -19,6 +19,7 @@ N = "0012345678901"
 class FaultTests(TestCase):
     def setUp(self):
         self.s = Scenario()
+        self.enterContext(self.s.acting())
         for m in self.s.m:
             bank.deposit(N, "1000", msisdn=m.msisdn, name="X")
         ref = self.s.approve("1200")

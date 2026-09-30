@@ -12,15 +12,19 @@ description: How to test Wepl_fin — real Postgres, where tests live per contex
 Run from `backend/` with the repo's venv:
 
 ```bash
-python manage.py test                                   # everything (~95 tests, ~20 s)
+python manage.py test                                   # everything (~130 tests, ~30 s)
 python manage.py test contexts.custody                  # one context
 python manage.py test tests.test_architecture           # boundary rules
 WEPL_PROPERTY_EXAMPLES=300 python manage.py test tests.test_properties
 python manage.py makemigrations --check --dry-run       # CI fails on model drift
 ```
 
-The tests need PostgreSQL 16. Triggers, `select_for_update`, partial unique
-constraints and `nulls_distinct` are Postgres-only; never use sqlite.
+The tests need PostgreSQL 16. Triggers, row-level security,
+`select_for_update`, partial unique constraints and `nulls_distinct` are
+Postgres-only; never use sqlite. **Connect as `wepl_app`, never as
+`postgres`.** A superuser ignores row-level security, so every tenancy test
+would pass for the wrong reason; `tests/test_tenancy.py` fails first if you
+try.
 
 ## Where tests go (guideline 29)
 
@@ -33,6 +37,24 @@ constraints and `nulls_distinct` are Postgres-only; never use sqlite.
 `backend/tests/scenario.py::Scenario` builds a group, members, a constitution
 and a simulated I&M account **through public surfaces only**. Use it rather than
 creating rows by hand.
+
+**Tenant context in tests (ADR-0009).**
+- **Each `Scenario` is its own tenant.** Pass `tenant_id=` to put a second
+  group in the same tenant. Its helpers (`sync`, `approve`, `balance_of`,
+  `assert_sound`) act inside it.
+- **Direct calls and ORM reads need the context.** Wrap them in
+  `with s.acting():`, or call `self.enterContext(s.acting())` at the end of
+  `setUp`.
+- **Tests without a scenario** use `act_for_new_tenant(self)`.
+- **Build every scenario before entering a context.** Provisioning inside a
+  tenant is refused.
+- **Choose the layer you are testing.** Two groups in *one* tenant test the
+  application checks (`tests/test_isolation.py`). Two tenants test row-level
+  security (`tests/test_tenancy.py`).
+- **Hypothesis runs many examples in one test method.** Use a `with` block per
+  example, not `enterContext`, and fire deferred triggers *outside* the
+  tenant block. `SET CONSTRAINTS` inside a released savepoint survives the
+  outer rollback, so set it back to `DEFERRED`.
 
 ## What `TestCase` proves here (verified 2026-09-30)
 

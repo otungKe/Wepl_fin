@@ -2,12 +2,17 @@
 from django.db import models
 from django.db.models import Q
 
+from contexts.tenancy.contract import TenantScope
+from persistence.tenancy import tenant_column
+
 from ..domain.accounts import AccountPurpose, Side
 
 SIDES = [(s.value, s.name.title()) for s in Side]
 
 
 class Account(models.Model):
+    tenant_scope = TenantScope.TENANT_SCOPED
+    tenant = tenant_column()
     purpose = models.CharField(max_length=20, choices=[(p.value, p.name) for p in AccountPurpose])
     group_id = models.BigIntegerField()
     fund_id = models.BigIntegerField()
@@ -31,7 +36,9 @@ class Account(models.Model):
 
 
 class JournalEntry(models.Model):
-    idempotency_key = models.CharField(max_length=160, unique=True)
+    tenant_scope = TenantScope.TENANT_SCOPED
+    tenant = tenant_column()
+    idempotency_key = models.CharField(max_length=160)  # unique per tenant
     fingerprint = models.TextField()
     group_id = models.BigIntegerField()
     fund_id = models.BigIntegerField()
@@ -46,9 +53,12 @@ class JournalEntry(models.Model):
 
     class Meta:
         indexes = [models.Index(fields=["fund_id", "id"]), models.Index(fields=["cause_type", "cause_id"])]
+        constraints = [models.UniqueConstraint(fields=["tenant", "idempotency_key"], name="ledger_entry_key_unique")]
 
 
 class JournalLine(models.Model):
+    tenant_scope = TenantScope.TENANT_SCOPED
+    tenant = tenant_column()
     entry = models.ForeignKey(JournalEntry, on_delete=models.PROTECT, related_name="lines")
     account = models.ForeignKey(Account, on_delete=models.PROTECT, related_name="lines")
     side = models.CharField(max_length=1, choices=SIDES)

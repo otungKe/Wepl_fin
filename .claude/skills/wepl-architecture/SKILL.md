@@ -35,7 +35,7 @@ ADR (guidelines 56–57).
 | generic PostgreSQL SQL for migrations | `backend/persistence/` |
 | a structural decision | a **new** ADR in `docs/adr/`, indexed in its README |
 
-The contexts are identity, communities, governance, ledger, custody,
+The contexts are tenancy, identity, communities, governance, ledger, custody,
 notifications, audit and shared_kernel. ADR-0002 says what each owns and does
 not own, and each context's `__init__.py` repeats it.
 
@@ -107,28 +107,47 @@ that changes the rule. Never loosen the test quietly.
   `WEPL_ENABLE_SIMULATOR=1`, the default for dev and CI. Production must set
   it to 0.
 
-## Isolation: what is real and what is not (ADR-0005)
+## Tenancy and isolation (ADR-0009, foundational decisions)
 
-- **Real:**
-  - Every command checks that the records it touches (member, fund, mandate,
-    statement line) belong to the same group.
-  - Mismatches raise, and `tests/test_isolation.py` proves it.
-  - Audit rows carry `group_id`.
-- **Not real yet:**
-  - There is no tenant model.
-  - There is no PostgreSQL row-level security.
-  - Queries are scoped by application code, not by the database.
-- **Do not describe group isolation to I&M or anyone outside the repo as a
-  database-enforced security boundary.** The tenancy model (group, or an
-  institution serving many groups) is an open question for Harry. When it is
-  decided, each new tenant-scoped table needs its policy from day one.
-- The original WEPL learned this the hard way: its tenancy mechanism was
-  "done" while the user → tenant resolver returned one default tenant for
-  everyone.
+Harry's [foundational decisions](../../../docs/architecture/foundational-decisions.md)
+make tenancy a layered security boundary:
+
+```text
+explicit tenant context → application checks → PostgreSQL RLS (forced) → database
+```
+
+- **Act inside a tenant.** Any code touching tenant data runs inside
+  `tenancy.public.tenant(tenant_id)`. Without it, the database shows nothing
+  and refuses every insert. That is deliberate: the policy fails closed.
+- **Jobs iterate tenants.** Use `tenant_ids(reason=..., actor=...)`, then act
+  for each tenant in turn. Never derive the tenant from a row.
+- **Outside a tenant, declare it.** Use `cross_tenant(reason, actor=...)`. It
+  is audited every time. Never add a convenient cross-tenant query.
+- **Never switch tenants inside a block.** It raises. Finish one tenant's work
+  first.
+- **Every new model declares `tenant_scope`:** GLOBAL, TENANT_SCOPED,
+  USER_SCOPED or SYSTEM. Choose it from the domain, and document unusual
+  cases in ADR-0009.
+- **A TENANT_SCOPED model** gets `tenant = tenant_column()` (from
+  `persistence.tenancy`), plus a migration that runs
+  `RunSQL(*tenant_scoped(table))`. `tests/test_tenancy.py` fails the build if
+  either is missing.
+- **Keys a client or workflow supplies are unique per tenant**
+  (`UniqueConstraint(fields=["tenant", ...])`), never globally.
+- **A trigger that reads other rows** runs under row-level security. If it
+  can fire after the context ends, as deferred triggers do, set the tenant
+  from `NEW.tenant_id` inside it, as the ledger's balance check does.
+- **Connect as `wepl_app`.** It is not a superuser and has no BYPASSRLS, or
+  RLS silently does nothing. The `tenancy.E001` check and a test enforce it.
+- **Group checks stay.** Commands still verify that member, fund, mandate and
+  line belong to one group. Those checks are the only protection between
+  groups in the same tenant (`tests/test_isolation.py`).
+- **Who the tenant is: open question for Harry.** The pilot default is one
+  tenant per group.
 
 ## ADR status
 
-All of ADR-0001 to ADR-0007 are **Proposed** until Harry accepts them.
+ADR-0001 (Django 5.2 LTS) is accepted; the rest are **Proposed** until Harry accepts them. Never move to Django 6.x without a named need and an ADR.
 ADR-0007 is a recorded shortcut: application code uses its own context's ORM
 models directly. "Proposed" does not mean absent; check the code.
 

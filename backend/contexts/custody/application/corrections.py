@@ -4,7 +4,6 @@ from django.db import transaction
 from django.utils import timezone
 
 from contexts.audit.public import operation, record
-from contexts.communities.public import membership
 from contexts.governance.public import MandateStatus, execute_mandate, mandate
 from contexts.identity.public import Msisdn
 
@@ -29,9 +28,7 @@ def attribute_payment(line_id: int, membership_id: int, *, by: int, remember_pay
     ea, line = _locked_line(line_id)
     actor = official(by, ea.group_id, beneficiaries=[membership_id]).msisdn
     with operation("custody.attribute_payment", actor=actor):
-        member = membership(membership_id)
-        if member.group_id != ea.group_id:
-            raise CustodyError("That member belongs to another group.")
+        member = bk.member_of(ea.group_id, membership_id)
         try:
             ensure_correction(bk.latest_outcome(line), Outcome.ATTRIBUTED)
         except InvalidCorrection as exc:

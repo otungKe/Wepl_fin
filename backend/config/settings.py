@@ -20,6 +20,7 @@ INSTALLED_APPS = [
     "django.contrib.contenttypes",
     "django.contrib.auth",
     "contexts.audit.infrastructure.apps.AuditConfig",
+    "contexts.tenancy.infrastructure.apps.TenancyConfig",
     "contexts.notifications.infrastructure.apps.NotificationsConfig",
     "contexts.identity.infrastructure.apps.IdentityConfig",
     "contexts.communities.infrastructure.apps.CommunitiesConfig",
@@ -49,7 +50,9 @@ DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
         "NAME": os.environ.get("DB_NAME", "wepl"),
-        "USER": os.environ.get("DB_USER", "postgres"),
+        # A role that is neither superuser nor BYPASSRLS, or row-level security
+        # would not apply (ADR-0009). The tenancy system check refuses otherwise.
+        "USER": os.environ.get("DB_USER", "wepl_app"),
         "PASSWORD": os.environ.get("DB_PASSWORD", ""),
         "HOST": os.environ.get("DB_HOST", "localhost"),
         "PORT": os.environ.get("DB_PORT", "5432"),

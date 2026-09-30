@@ -1,7 +1,10 @@
 from django.db import models
 
+from contexts.tenancy.contract import TenantScope
+
 
 class SimAccount(models.Model):
+    tenant_scope = TenantScope.GLOBAL  # a stand-in for the bank's own system, not WEPL data
     number = models.CharField(max_length=40, unique=True)
     name = models.CharField(max_length=120)
     balance = models.DecimalField(max_digits=18, decimal_places=2, default=0)
@@ -9,6 +12,7 @@ class SimAccount(models.Model):
 
 
 class SimTransaction(models.Model):
+    tenant_scope = TenantScope.GLOBAL
     account = models.ForeignKey(SimAccount, on_delete=models.PROTECT, related_name="transactions")
     txn_id = models.CharField(max_length=32, unique=True)
     sequence = models.BigIntegerField()

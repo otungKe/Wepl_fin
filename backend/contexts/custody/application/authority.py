@@ -1,5 +1,5 @@
 """Resolves the official making a correction and refuses anyone else."""
-from contexts.communities.public import MembershipView, membership
+from contexts.communities.public import CommunityError, MembershipView, membership
 
 from ..contract import CustodyError
 from ..domain.authority import Actor, pair_refusal, refusal
@@ -8,7 +8,7 @@ from ..domain.authority import Actor, pair_refusal, refusal
 def _actor(membership_id: int) -> tuple[Actor, MembershipView]:
     try:
         m = membership(membership_id)
-    except IndexError:
+    except CommunityError:
         raise CustodyError("Not authorised: unknown official.") from None
     return Actor(membership_id=m.id, group_id=m.group_id, active=m.is_active, official=m.is_official), m
 

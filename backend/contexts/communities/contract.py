@@ -2,7 +2,11 @@ from dataclasses import dataclass
 
 from .domain.membership import MembershipStatus, Role, Segment
 
-__all__ = ["FundView", "GroupView", "MembershipView", "MembershipStatus", "Role", "Segment"]
+__all__ = ["CommunityError", "FundView", "GroupView", "MembershipView", "MembershipStatus", "Role", "Segment"]
+
+
+class CommunityError(ValueError):
+    pass
 
 
 @dataclass(frozen=True)

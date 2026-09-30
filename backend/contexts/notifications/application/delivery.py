@@ -6,6 +6,8 @@ from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 
+from contexts.tenancy.public import tenant, tenant_ids
+
 from ..infrastructure.models import OutboxEvent
 from .ports import Notifier
 
@@ -15,25 +17,34 @@ LEASE = timedelta(minutes=5)
 
 
 def deliver_pending(notifier: Notifier, *, limit: int) -> int:
-    """Claim a message under a short lease, call the provider with no database
-    transaction open, then record the outcome. Two workers never hold the same
-    message; a worker that dies mid-call releases it when the lease expires.
-    Each pass tries a message at most once, up to MAX_ATTEMPTS in total."""
-    delivered, tried = 0, []
-    for _ in range(limit):
-        event = _claim(exclude=tried)
-        if event is None:
-            break
-        tried.append(event.pk)
-        try:
-            notifier.deliver(event.topic, event.payload)  # never inside a transaction
-        except Exception as exc:  # any provider failure is retried on a later pass
-            _record(event.pk, error=repr(exc)[:2000])
-            log.warning("outbox %s failed (attempt %s, operation %s): %s",
-                        event.pk, event.attempts, event.operation_id, exc)
-        else:
-            _record(event.pk, error=None)
-            delivered += 1
+    """A worker: tenant by tenant, claim a message under a short lease, call
+    the provider with no database transaction and no tenant context open, then
+    record the outcome. Every step sets its tenant explicitly and clears it on
+    exit, so nothing carries over between messages or tenants (decision 7).
+    Two workers never hold the same message; a worker that dies mid-call
+    releases it when the lease expires. Each pass tries a message at most
+    once, up to MAX_ATTEMPTS in total."""
+    delivered, budget = 0, limit
+    for tenant_id in tenant_ids(reason="deliver queued notifications", actor="system"):
+        tried = []
+        while budget > 0:
+            with tenant(tenant_id):
+                event = _claim(exclude=tried)
+            if event is None:
+                break
+            budget -= 1
+            tried.append(event.pk)
+            try:
+                notifier.deliver(event.topic, event.payload)  # never inside a transaction or tenant
+            except Exception as exc:  # any provider failure is retried on a later pass
+                with tenant(tenant_id):
+                    _record(event.pk, error=repr(exc)[:2000])
+                log.warning("outbox %s failed (attempt %s, operation %s): %s",
+                            event.pk, event.attempts, event.operation_id, exc)
+            else:
+                with tenant(tenant_id):
+                    _record(event.pk, error=None)
+                delivered += 1
     return delivered
 
 

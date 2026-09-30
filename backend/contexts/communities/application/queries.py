@@ -1,6 +1,6 @@
 from contexts.identity.public import people
 
-from ..contract import FundView, GroupView, MembershipView
+from ..contract import CommunityError, FundView, GroupView, MembershipView
 from ..infrastructure.models import Fund, Group, Membership
 
 
@@ -23,7 +23,12 @@ def _views(rows) -> list[MembershipView]:
 
 
 def membership(membership_id: int) -> MembershipView:
-    return _views(Membership.objects.filter(pk=membership_id))[0]
+    """Raises CommunityError for an id that does not exist or, under row-level
+    security, belongs to another tenant: the two are indistinguishable."""
+    views = _views(Membership.objects.filter(pk=membership_id))
+    if not views:
+        raise CommunityError(f"Unknown member {membership_id}.")
+    return views[0]
 
 
 def members(group_id: int, *, active_only: bool = True) -> list[MembershipView]:

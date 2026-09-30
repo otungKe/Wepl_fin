@@ -21,6 +21,7 @@ def line_where(**kw):
 class ContributionTests(TestCase):
     def setUp(self):
         self.s = Scenario()
+        self.enterContext(self.s.acting())
 
     def test_deposit_attributed_by_phone(self):
         bank.deposit(N, "1000", msisdn="254712000004", name="KIPRONO C")
@@ -59,6 +60,8 @@ class ContributionTests(TestCase):
         self.assertEqual(self.s.balance_of(self.s.m[1]), Money("1007.50"))
         self.assertTrue(run.balanced)
 
+
+class RetainedTests(TestCase):
     def test_retained_interest_and_charges(self):
         s = Scenario("Retained", account="999", rules={**RULES, "interest": "retained", "bank_charges": "retained"})
         bank.deposit("999", "1000", msisdn="0712000001", name="A")
@@ -72,6 +75,7 @@ class ContributionTests(TestCase):
 class WithdrawalTests(TestCase):
     def setUp(self):
         self.s = Scenario()
+        self.enterContext(self.s.acting())
         for i, m in enumerate(self.s.m):
             bank.deposit(N, str(1000 * (i + 1)), msisdn=m.msisdn, name="X")
         self.s.sync()
@@ -158,6 +162,7 @@ class WithdrawalTests(TestCase):
 class OnboardingAndReportTests(TestCase):
     def test_opening_balances_with_remainder_unattributed(self):
         s = Scenario(opening_balance="10000.00")
+        self.enterContext(s.acting())
         record_opening_balances(s.ea.id, statement_balance="10000.00",
                                 member_balances={s.m[0].id: "4000", s.m[1].id: "5000"}, by=s.m[1].id,
                                 confirmed_by=s.m[0].id)
@@ -172,10 +177,11 @@ class OnboardingAndReportTests(TestCase):
 
     def test_opening_balances_are_checked(self):
         s = Scenario(opening_balance="100.00")
+        other = Scenario("Other", account="777", tenant_id=s.tenant_id)  # same tenant, another group
+        self.enterContext(s.acting())
         with self.assertRaisesMessage(CustodyError, "more than the bank"):
             record_opening_balances(s.ea.id, statement_balance="100", member_balances={s.m[0].id: "200"}, by=s.m[1].id,
                                     confirmed_by=s.m[0].id)
-        other = Scenario("Other", account="777")
-        with self.assertRaisesMessage(CustodyError, "another group"):
+        with self.assertRaisesMessage(CustodyError, "not in this group"):
             record_opening_balances(s.ea.id, statement_balance="100", member_balances={other.m[0].id: "50"}, by=s.m[1].id,
                                     confirmed_by=s.m[0].id)

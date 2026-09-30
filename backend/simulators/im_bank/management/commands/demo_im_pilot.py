@@ -12,6 +12,7 @@ from contexts.custody import public as custody
 from contexts.governance.public import adopt_constitution, decide, propose_withdrawal, proposal_view
 from contexts.notifications.public import topics_since
 from contexts.shared_kernel.money import Money
+from contexts.tenancy.public import provision_tenant, tenant
 from simulators.im_bank import bank
 from simulators.im_bank.connector import Faults, SimulatorConnector
 
@@ -53,8 +54,13 @@ class Command(BaseCommand):
         started = timezone.now()
         number = "01" + started.strftime("%y%m%d%H%M%S")
         name = f"Umoja Savings Group {number[-6:]}"
+        tenant_id = provision_tenant(name, actor="operator").id  # one tenant per pilot group (ADR-0009)
+        with tenant(tenant_id):
+            self.pilot(name, number, started, seed)
+        self.isolation(tenant_id, number)
 
-        self.step("1. Onboarding: group, constitution, members, existing I&M Chama Account")
+    def pilot(self, name, number, started, seed):
+        self.step("1. Onboarding: tenant, group, constitution, members, existing I&M Chama Account")
         group, fund = create_group(name, actor="operator")
         version = adopt_constitution(group.id, RULES, actor="operator")
         members = {n: add_member(group.id, msisdn=m, name=n, role=r, actor="operator") for m, n, r, _ in PEOPLE}
@@ -141,6 +147,17 @@ class Command(BaseCommand):
         self.step("11. Notifications queued (delivered by the outbox worker; SMS provider on hold)")
         for topic, count in sorted(Counter(topics_since(started)).items()):
             self.say(f"{topic:<32} {count}")
+
+    def isolation(self, tenant_id, number):
+        self.step("12. Another tenant sees nothing of this group, even with raw SQL")
+        neighbour = provision_tenant("Neighbouring tenant", actor="operator").id
+        with tenant(neighbour), connection.cursor() as cur:
+            for table in ("ledger_journalentry", "custody_statementline", "communities_membership"):
+                cur.execute(f"SELECT count(*) FROM {table}")
+                self.say(f"{table:<26} rows visible to the neighbour: {cur.fetchone()[0]}")
+        with tenant(tenant_id), connection.cursor() as cur:
+            cur.execute("SELECT count(*) FROM ledger_journalentry")
+            self.say(f"{'ledger_journalentry':<26} rows visible to this group's tenant: {cur.fetchone()[0]}")
 
     def _line_from(self, ea_id, msisdn=None, reference=None):
         """Find a statement line the way an official would: by what the bank showed."""

@@ -1,6 +1,8 @@
 # ADR-0005: The group is the data-isolation boundary, for now
 
-- **Status:** Proposed; **open question** (2026-09-30)
+- **Status:** Superseded in part by [ADR-0009](0009-tenancy-with-row-level-security.md)
+  (2026-09-30). The group checks below remain as the application layer
+  beneath row-level security; the open question is answered there.
 
 ## Context
 

@@ -72,7 +72,9 @@ context owns and does not own is in ADR-0002 and in each context's
   change that caused it. Rows are delivered at least once, with dedupe keys,
   and failures are retried on a later pass. SMS is on hold; the default
   notifier logs.
-- **Isolation.** The group is the boundary until tenancy is decided (ADR-0005).
+- **Tenancy.** Every operation runs in an explicit tenant context. Tenant
+  data is isolated by forced PostgreSQL row-level security, and application
+  checks keep groups apart inside a tenant (ADR-0009, ADR-0005).
 
 ## Evidence for I&M (custody design §8)
 
@@ -91,6 +93,7 @@ context owns and does not own is in ADR-0002 and in each context's
 - **Payouts through I&M's APIs** (Model C, a `payments` context).
 - **The real I&M statement format:** waiting on a sample export.
 - **Contributions:** cycles, arrears and goals.
-- **Authentication, tenancy, HTTP API and backoffice.**
+- **Authentication, HTTP API and backoffice.** Who the tenant is (group or
+  institution) awaits Harry; the pilot default is one tenant per group.
 - **Scale and concurrency:** cross-process concurrency tests, load tests.
 - **Group life:** chat, announcements, meetings, vault.

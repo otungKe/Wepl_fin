@@ -1,6 +1,7 @@
 from django.core.management.base import BaseCommand
 
 from contexts.custody.public import all_accounts, connector_for, reconcile, sync
+from contexts.tenancy.public import tenant, tenant_ids
 
 
 class Command(BaseCommand):
@@ -8,14 +9,19 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         failures = 0
-        for ea in all_accounts():
-            connector = connector_for(ea.connector, sweep=True)
-            if connector is None:  # statements for this account arrive by upload
-                result, run = None, reconcile(ea.id)
-            else:
-                result, run = sync(ea.id, connector)
-            failures += not run.balanced
-            self.stdout.write(f"{ea}: {'balanced' if run.balanced else 'NOT BALANCED'}; difference {run.difference}; "
-                              f"new lines {result.new if result else 0}; open alerts {run.open_alerts}")
+        for tenant_id in tenant_ids(reason="sync and reconcile every custodian account", actor="system"):
+            with tenant(tenant_id):  # set for this tenant's accounts only, cleared on exit
+                for ea in all_accounts():
+                    failures += not self._sync(ea)
         if failures:
             self.stderr.write(f"{failures} account(s) did not reconcile.")
+
+    def _sync(self, ea) -> bool:
+        connector = connector_for(ea.connector, sweep=True)
+        if connector is None:  # statements for this account arrive by upload
+            result, run = None, reconcile(ea.id)
+        else:
+            result, run = sync(ea.id, connector)
+        self.stdout.write(f"{ea}: {'balanced' if run.balanced else 'NOT BALANCED'}; difference {run.difference}; "
+                          f"new lines {result.new if result else 0}; open alerts {run.open_alerts}")
+        return run.balanced
