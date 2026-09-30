@@ -4,7 +4,7 @@ from django.db.models import Q
 from contexts.tenancy.contract import TenantScope
 from persistence.tenancy import tenant_column
 
-from ..domain.membership import MembershipStatus, Role, Segment
+from ..domain.membership import TITLE_MAX, MembershipStatus, Segment
 
 
 class Group(models.Model):
@@ -39,7 +39,7 @@ class Membership(models.Model):
     # Cross-context reference to identity (ADR-0004): a membership is a person's
     # relationship with a group; people are never deleted.
     person = models.ForeignKey("identity.Person", on_delete=models.PROTECT, related_name="+")
-    role = models.CharField(max_length=20, choices=[(r, r) for r in Role], default=Role.MEMBER)
+    title = models.CharField(max_length=TITLE_MAX, blank=True, default="")  # a label only (ADR-0011)
     status = models.CharField(max_length=10, choices=[(s, s) for s in MembershipStatus],
                               default=MembershipStatus.ACTIVE)
     member_code = models.CharField(max_length=8)

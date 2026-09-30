@@ -4,11 +4,12 @@ from datetime import datetime
 
 from contexts.shared_kernel.money import Money
 
+from .domain.capabilities import Capability
 from .domain.lifecycle import InvalidTransition, MandateStatus, ProposalStatus
 from .domain.mandate import MANDATE_REFERENCE, Allocation
 from .domain.rules import ConstitutionRules, RulesError, SharingRule
 
-__all__ = ["Allocation", "ConstitutionRules", "GovernanceError", "InvalidTransition", "MANDATE_REFERENCE",
+__all__ = ["Allocation", "Capability", "ConstitutionRules", "GovernanceError", "InvalidTransition", "MANDATE_REFERENCE",
            "MandateStatus", "MandateView", "ProposalStatus", "ProposalView", "RulesError", "SharingRule"]
 
 

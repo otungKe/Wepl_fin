@@ -11,7 +11,7 @@ from ..domain.resolution import Outcome
 from ..domain.statement import LineKind
 from ..infrastructure.models import ExternalAccount, StatementLine
 from . import bookkeeping as bk
-from .authority import two_officials
+from .authority import maker_checker
 
 
 @transaction.atomic  # the opening line, its entry and resolution are one fact
@@ -19,10 +19,10 @@ def record_opening_balances(ea_id: int, *, statement_balance, member_balances: d
                             confirmed_by: int) -> int | None:
     """Bring an existing account into WEPL before any other line.
     ``member_balances`` maps membership id to the amount signed off by two
-    different officials, ``by`` and ``confirmed_by`` (membership ids).
+    different members holding correct_records, ``by`` and ``confirmed_by`` (membership ids).
     Returns the opening line's id, or None for an empty account."""
     ea = ExternalAccount.objects.select_for_update().get(pk=ea_id)
-    maker, checker = two_officials(by, confirmed_by, ea.group_id)
+    maker, checker = maker_checker(by, confirmed_by, ea.group_id)
     actor = maker.msisdn
     with operation("custody.opening_balances", actor=actor):
         balance = Money.of(statement_balance, ea.currency)

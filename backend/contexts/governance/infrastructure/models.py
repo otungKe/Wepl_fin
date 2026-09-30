@@ -1,4 +1,5 @@
-"""Governance persistence. Constitutions and approvals are append-only (0002).
+"""Governance persistence. Constitutions, approvals and capability changes
+are append-only (0002, 0005).
 
 Cross-context references to communities (group, fund, membership) are
 deliberate foreign keys (ADR-0004): a proposal is always made in a group, on
@@ -10,6 +11,7 @@ from django.db.models import Q
 from contexts.tenancy.contract import TenantScope
 from persistence.tenancy import tenant_column
 
+from ..domain.capabilities import Capability
 from ..domain.lifecycle import MandateStatus, ProposalStatus
 from ..domain.mandate import Allocation, new_reference
 
@@ -104,3 +106,21 @@ class Mandate(models.Model):
                                    name="gov_executed_mandate_has_line"),
         ]
         indexes = [models.Index(fields=["fund", "status", "amount"])]
+
+
+class CapabilityChange(models.Model):
+    """One grant or revocation of a capability to a member (ADR-0011).
+    Append-only: what a member may do now is their latest change per
+    capability, and the full history of who could do what stays."""
+
+    tenant_scope = TenantScope.TENANT_SCOPED
+    tenant = tenant_column()
+    group = models.ForeignKey(GROUP, on_delete=models.PROTECT, related_name="+")
+    membership = models.ForeignKey(MEMBERSHIP, on_delete=models.PROTECT, related_name="+")
+    capability = models.CharField(max_length=30, choices=_choices(Capability))
+    granted = models.BooleanField()
+    changed_by = models.CharField(max_length=120)
+    changed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [models.Index(fields=["membership", "id"])]

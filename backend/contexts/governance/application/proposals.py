@@ -10,16 +10,19 @@ from contexts.notifications.public import notify
 from contexts.shared_kernel.money import Money
 
 from ..contract import GovernanceError, ProposalView
+from ..domain.capabilities import Capability
 from ..domain.lifecycle import PROPOSAL_TRANSITIONS, ProposalStatus, ensure
 from ..domain.mandate import Allocation
 from ..domain.rules import ApproverSet, ConstitutionRules
 from ..domain.voting import ProposalTerms, Voter, ineligibility, tally
 from ..infrastructure.models import Approval, Mandate, Proposal
+from .capabilities import holds
 from .constitution import current_constitution
 
 
 def _voter(m: MembershipView) -> Voter:
-    return Voter(membership_id=m.id, group_id=m.group_id, active=m.is_active, official=m.is_official, msisdn=m.msisdn)
+    return Voter(membership_id=m.id, group_id=m.group_id, active=m.is_active, msisdn=m.msisdn,
+                 designated_approver=holds(m.id, Capability.APPROVE_PAYOUT))
 
 
 def _terms(p: Proposal) -> ProposalTerms:
@@ -118,8 +121,8 @@ def decide(proposal_id: int, voter_id: int, *, approve: bool, source: str = "app
 def cancel_proposal(proposal_id: int, actor_id: int) -> ProposalView:
     p = Proposal.objects.select_for_update().get(pk=proposal_id)
     actor = membership(actor_id)
-    if actor.group_id != p.group_id or (actor.id != p.proposed_by_id and not actor.is_official):
-        raise GovernanceError("Only the proposer or an official of this group can cancel.")
+    if actor.group_id != p.group_id or (actor.id != p.proposed_by_id and not holds(actor.id, Capability.CANCEL_PAYOUT)):
+        raise GovernanceError("Only the proposer, or a member of this group granted cancel_payout, can cancel.")
     _move(p, ProposalStatus.CANCELLED)
     record(actor.msisdn, "proposal.cancelled", target_type="proposal", target_id=p.pk, group_id=p.group_id)
     return proposal_view(p.pk)

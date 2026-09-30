@@ -19,6 +19,9 @@ running in a production process, beside real accounts.
    a membership id. The pure rule is `custody/domain/authority.py`, and it
    refuses the actor unless they are an **active official of the account's
    own group**. Officials are the chair, treasurer and secretary.
+   *Amended by [ADR-0011](0011-membership-titles-and-capabilities.md):*
+   "official" now means "holds the `correct_records` capability". A title
+   grants nothing. Every rule below is otherwise unchanged.
 2. **No correction in your own favour.** An official cannot attribute a
    payment to themselves. The same rule governance applies to voting.
 3. **Maker-checker for opening balances.** `record_opening_balances` needs

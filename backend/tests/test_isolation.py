@@ -12,15 +12,15 @@ from contexts.governance.infrastructure.models import Approval, Mandate, Proposa
 from contexts.governance.public import GovernanceError, decide, propose_withdrawal
 from contexts.tenancy.public import cross_tenant
 from simulators.im_bank import bank
-from tests.scenario import Scenario
+from tests.scenario import SIGNATORY, Scenario
 
 
 class CrossGroupTests(TestCase):
     def setUp(self):
         self.a = Scenario("Group A", account="A1")
-        self.b = Scenario("Group B", account="B1", people=[("0722000001", "B1", "chair"),
-                                                           ("0722000002", "B2", "treasurer"),
-                                                           ("0722000003", "B3", "secretary")])
+        self.b = Scenario("Group B", account="B1", people=[("0722000001", "B1", "Chair", SIGNATORY),
+                                                           ("0722000002", "B2", "Treasurer", SIGNATORY),
+                                                           ("0722000003", "B3", "Secretary", SIGNATORY)])
         for m in self.a.m:
             bank.deposit("A1", "1000", msisdn=m.msisdn, name="X")
         bank.deposit("A1", "50", msisdn="0733000000", name="STRANGER")
@@ -51,7 +51,7 @@ class CrossGroupTests(TestCase):
             attribute_payment(self.a_stranger, self.b.m[0].id, by=self.a.m[1].id)
         self.assert_nothing_written()
 
-    def test_another_groups_official_cannot_correct(self):
+    def test_another_groups_corrector_cannot_correct(self):
         with self.widened(), self.assertRaisesMessage(CustodyError, "not a member of this group"):
             attribute_payment(self.a_stranger, self.a.m[4].id, by=self.b.m[1].id)
         self.assert_nothing_written()

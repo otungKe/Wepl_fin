@@ -110,8 +110,8 @@ NOT NULL tenant (`tests/test_tenancy.py`).
 
 | Data | Scope | Why |
 |---|---|---|
-| Groups, funds, memberships | TENANT_SCOPED | a group and its people's roles belong to its tenant |
-| Constitutions, proposals, approvals, mandates | TENANT_SCOPED | governance of one group |
+| Groups, funds, memberships | TENANT_SCOPED | a group and its people's titles belong to its tenant |
+| Constitutions, capability changes, proposals, approvals, mandates | TENANT_SCOPED | governance of one group |
 | Ledger accounts, journal entries, journal lines | TENANT_SCOPED | the money; the original WEPL left journals unscoped |
 | Custodian accounts, statement lines, resolutions, payer mappings, alerts, reconciliations | TENANT_SCOPED | the bank's view of one group's money |
 | Outbox messages | TENANT_SCOPED | they carry members' phone numbers |
@@ -122,7 +122,7 @@ NOT NULL tenant (`tests/test_tenancy.py`).
 
 ### What the application layer still does (decision 5)
 
-**Commands still check group membership, officials and mandates** (ADR-0005,
+**Commands still check group membership, capabilities (ADR-0011) and mandates** (ADR-0005,
 ADR-0008). They are defence in depth: `tests/test_isolation.py` widens RLS
 on purpose with a declared cross-tenant operation, and shows the checks
 still refuse to mix groups and write nothing.

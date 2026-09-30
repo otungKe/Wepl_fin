@@ -57,7 +57,7 @@ context owns and does not own is in ADR-0002 and in each context's
 4. **Reconcile.** WEPL's cash is compared with the custodian's running
    balance. Missing sequence numbers and unaccounted lines are also checked.
    Any difference raises an alert.
-5. **Correct.** Officials can attribute a held payment (the payer is
+5. **Correct.** Members granted `correct_records` (ADR-0011) can attribute a held payment (the payer is
    remembered) or explain an unmatched payout with a mandate approved after
    the fact. Each correction is a new entry and a new resolution; nothing is
    edited.

@@ -9,7 +9,7 @@ from ..infrastructure.models import Constitution
 @transaction.atomic  # version numbers are assigned under a lock on the latest version
 def adopt_constitution(group_id: int, rules: dict, *, actor: str) -> int:
     """Adopt a new version. Earlier versions stay, and proposals keep the
-    version they were made under. (Pilot: officials sign it off on paper.)"""
+    version they were made under. (Pilot: the group signs it off on paper.)"""
     parsed = ConstitutionRules.parse(rules)
     latest = Constitution.objects.select_for_update().filter(group_id=group_id).order_by("-version").first()
     version = latest.version + 1 if latest else 1

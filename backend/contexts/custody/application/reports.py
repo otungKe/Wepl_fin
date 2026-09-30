@@ -1,4 +1,4 @@
-"""Read-only projections for members, officials and the bank. Never a source of truth."""
+"""Read-only projections for members, the group and the bank. Never a source of truth."""
 from contexts.communities.public import group_view, members, membership
 from contexts.ledger.public import fund_position, member_balances, member_movements
 from contexts.shared_kernel.money import Money

@@ -12,8 +12,14 @@ class RulesError(ValueError):
 
 
 class ApproverSet(StrEnum):
-    OFFICIALS = "officials"
-    MEMBERS = "members"
+    DESIGNATED = "designated"  # only members the group granted APPROVE_PAYOUT (ADR-0011)
+    MEMBERS = "members"        # any active member
+
+
+# Constitutions adopted before ADR-0011 said "officials". They are append-only,
+# so the old word is still read; migration governance 0004 granted every former
+# official APPROVE_PAYOUT, so it means exactly what it meant then.
+_FORMER = {"officials": ApproverSet.DESIGNATED}
 
 
 class SharingRule(StrEnum):
@@ -51,7 +57,7 @@ class ConstitutionRules:
                 raise RulesError("Approval rules must be in increasing order of amount.")
             last = up_to
             try:
-                approvers = ApproverSet(rule.get("approvers"))
+                approvers = _FORMER.get(rule.get("approvers")) or ApproverSet(rule.get("approvers"))
             except ValueError:
                 raise RulesError(f"approvers must be one of {[a.value for a in ApproverSet]}.") from None
             required = int(rule.get("required", 0))

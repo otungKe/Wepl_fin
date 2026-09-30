@@ -17,7 +17,7 @@ class MemberFacts:
 def attribute(*, reference: str, narration: str, payer_msisdn: str, members: list[MemberFacts],
               remembered_payers: dict[str, int]) -> int | None:
     """In order: a member code quoted in the reference or narration; a payer
-    number the treasurer has confirmed before; the member's own number.
+    number a corrector has confirmed before; the member's own number.
     Otherwise None: the money is held as unattributed until someone says."""
     by_code = {m.code.upper(): m.id for m in members}
     for token in re.findall(r"[A-Za-z0-9]+", f"{reference} {narration}"):

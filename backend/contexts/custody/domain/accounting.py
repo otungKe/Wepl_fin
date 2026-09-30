@@ -113,7 +113,7 @@ def payout_explained(book: FundBook, *, key: str, line_id: int, amount: Money, a
 
 def opening_balances(book: FundBook, *, key: str, line_id: int, statement_balance: Money,
                      signed_off: dict[int, Money]) -> JournalDraft:
-    """Bring an existing account in: members get what the treasurer signed
+    """Bring an existing account in: members get what two correct_records holders signed
     off; anything in the bank nobody can account for is held as unattributed."""
     total = Money.zero(book.currency)
     for amount in signed_off.values():

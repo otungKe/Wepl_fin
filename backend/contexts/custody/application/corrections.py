@@ -1,4 +1,4 @@
-"""Use cases: an official explains a line the system could not account for.
+"""Use cases: a member granted correct_records explains a line the system could not account for.
 Corrections are new journal entries and new resolutions; nothing is edited."""
 from django.db import transaction
 from django.utils import timezone
@@ -12,7 +12,7 @@ from ..domain import accounting
 from ..domain.resolution import InvalidCorrection, Outcome, ensure_correction
 from ..infrastructure.models import Alert, ExternalAccount, LineResolution, PayerMapping, StatementLine
 from . import bookkeeping as bk
-from .authority import official
+from .authority import corrector
 
 
 def _locked_line(line_id: int) -> tuple[ExternalAccount, StatementLine]:
@@ -23,10 +23,10 @@ def _locked_line(line_id: int) -> tuple[ExternalAccount, StatementLine]:
 
 @transaction.atomic  # entry, resolution, payer memory and audit commit together
 def attribute_payment(line_id: int, membership_id: int, *, by: int, remember_payer: bool = True) -> LineResolution:
-    """Credit an unattributed receipt to the member an official names. ``by``
-    is the official's membership id; nobody may credit themselves."""
+    """Credit an unattributed receipt to the member a corrector names. ``by``
+    is the corrector's membership id; nobody may credit themselves."""
     ea, line = _locked_line(line_id)
-    actor = official(by, ea.group_id, beneficiaries=[membership_id]).msisdn
+    actor = corrector(by, ea.group_id, beneficiaries=[membership_id]).msisdn
     with operation("custody.attribute_payment", actor=actor):
         member = bk.member_of(ea.group_id, membership_id)
         try:
@@ -37,7 +37,7 @@ def attribute_payment(line_id: int, membership_id: int, *, by: int, remember_pay
         draft = accounting.payer_identified(bk.book(ea), key=f"line:{line.pk}:attribute:{count}", line_id=line.pk,
                                             amount=bk.amount(line), member_id=member.id)
         resolution = bk.post_and_resolve(line, draft, Outcome.ATTRIBUTED, membership_id=member.id, actor=actor,
-                                         note="Attributed by an official")
+                                         note="Attributed by a corrector")
         payer = Msisdn.try_parse(line.counterparty_msisdn)
         if remember_payer and payer is not None:
             PayerMapping.objects.get_or_create(group_id=ea.group_id, msisdn=payer.value,
@@ -50,9 +50,9 @@ def attribute_payment(line_id: int, membership_id: int, *, by: int, remember_pay
 @transaction.atomic  # the mandate claim, entry, resolution and alert closure commit together
 def explain_outflow(line_id: int, mandate_id: int, *, by: int) -> LineResolution:
     """Tie an unmatched payout to a mandate approved after the fact. ``by`` is
-    the official's membership id; the mandate itself carries the group's approval."""
+    the corrector's membership id; the mandate itself carries the group's approval."""
     ea, line = _locked_line(line_id)
-    actor = official(by, ea.group_id).msisdn
+    actor = corrector(by, ea.group_id).msisdn
     with operation("custody.explain_outflow", actor=actor):
         m = mandate(mandate_id)
         try:

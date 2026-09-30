@@ -14,7 +14,7 @@ class Voter:
     membership_id: int
     group_id: int
     active: bool
-    official: bool
+    designated_approver: bool  # holds APPROVE_PAYOUT
     msisdn: str
 
 
@@ -35,8 +35,8 @@ def ineligibility(voter: Voter, terms: ProposalTerms) -> str | None:
         return "not a member of this group"
     if not voter.active:
         return "not an active member"
-    if terms.approvers is ApproverSet.OFFICIALS and not voter.official:
-        return "only officials approve withdrawals of this size"
+    if terms.approvers is ApproverSet.DESIGNATED and not voter.designated_approver:
+        return "only designated approvers approve withdrawals of this size"
     if terms.allow_self_approval:
         return None
     if voter.membership_id == terms.proposer_id:

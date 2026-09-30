@@ -84,9 +84,10 @@ def _deposit(ea, line):
                dedupe_key=f"contribution.received:{line.pk}")
     else:
         bk.post_and_resolve(line, draft, Outcome.UNATTRIBUTED, note="Payer not recognised")
-        notify("treasurer.identify_payer", {"group_id": ea.group_id, "line_id": line.pk, "amount": str(line.amount),
-                                            "payer": line.counterparty_name, "msisdn": line.counterparty_msisdn},
-               dedupe_key=f"treasurer.identify_payer:{line.pk}")
+        # For whoever the group granted correct_records, not a title (ADR-0011).
+        notify("payer.unidentified", {"group_id": ea.group_id, "line_id": line.pk, "amount": str(line.amount),
+                                      "payer": line.counterparty_name, "msisdn": line.counterparty_msisdn},
+               dedupe_key=f"payer.unidentified:{line.pk}")
 
 
 def _interest(ea, line):

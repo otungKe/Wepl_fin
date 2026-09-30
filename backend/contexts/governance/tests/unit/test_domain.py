@@ -7,15 +7,20 @@ from contexts.governance.domain.rules import ApproverSet, ConstitutionRules, Rul
 from contexts.governance.domain.voting import ProposalTerms, Voter, ineligibility, tally
 from contexts.shared_kernel.money import Money
 
-RULES = {"approvals": [{"up_to": "20000", "approvers": "officials", "required": 2},
+RULES = {"approvals": [{"up_to": "20000", "approvers": "designated", "required": 2},
                        {"up_to": None, "approvers": "members", "required": 3}]}
 
 
 class RulesTests(SimpleTestCase):
     def test_tiers_by_amount(self):
         r = ConstitutionRules.parse(RULES)
-        self.assertEqual(r.tier_for(Money("20000")).approvers, ApproverSet.OFFICIALS)
+        self.assertEqual(r.tier_for(Money("20000")).approvers, ApproverSet.DESIGNATED)
         self.assertEqual(r.tier_for(Money("20000.01")).required, 3)
+
+    def test_constitutions_adopted_before_adr_0011_still_read(self):
+        """They said "officials"; every former official was granted APPROVE_PAYOUT."""
+        old = {"approvals": [{"up_to": None, "approvers": "officials", "required": 2}]}
+        self.assertEqual(ConstitutionRules.parse(old).tiers[0].approvers, ApproverSet.DESIGNATED)
 
     def test_round_trips(self):
         r = ConstitutionRules.parse(RULES)
@@ -23,7 +28,7 @@ class RulesTests(SimpleTestCase):
 
     def test_invalid_rules_rejected(self):
         for raw in ({"approvals": []},
-                    {"approvals": [{"up_to": "10", "approvers": "officials", "required": 1}]},
+                    {"approvals": [{"up_to": "10", "approvers": "designated", "required": 1}]},
                     {"approvals": [{"up_to": None, "approvers": "anyone", "required": 1}]},
                     {"approvals": [{"up_to": None, "approvers": "members", "required": 0}]},
                     {"approvals": [{"up_to": "10", "approvers": "members", "required": 1},
@@ -36,18 +41,18 @@ class RulesTests(SimpleTestCase):
 
 class VotingTests(SimpleTestCase):
     terms = ProposalTerms(group_id=1, proposer_id=2, charged_member_id=4, payee_account="0712000009",
-                          approvers=ApproverSet.OFFICIALS, required=2, allow_self_approval=False)
+                          approvers=ApproverSet.DESIGNATED, required=2, allow_self_approval=False)
 
     def voter(self, mid=1, **kw):
-        base = dict(membership_id=mid, group_id=1, active=True, official=True, msisdn="254712000001")
+        base = dict(membership_id=mid, group_id=1, active=True, designated_approver=True, msisdn="254712000001")
         return Voter(**{**base, **kw})
 
-    def test_eligible_official(self):
+    def test_eligible_designated_approver(self):
         self.assertIsNone(ineligibility(self.voter(), self.terms))
 
     def test_reasons_for_refusal(self):
         cases = {"another group": self.voter(group_id=2), "active": self.voter(active=False),
-                 "officials": self.voter(official=False), "request they made": self.voter(mid=2),
+                 "designated approvers": self.voter(designated_approver=False), "request they made": self.voter(mid=2),
                  "charged to themselves": self.voter(mid=4), "payment to themselves": self.voter(msisdn="254712000009")}
         for expected, voter in cases.items():
             self.assertIn(expected.split()[-1], ineligibility(voter, self.terms))
@@ -77,3 +82,11 @@ class LifecycleTests(SimpleTestCase):
     def test_references_are_recognisable(self):
         for _ in range(50):
             self.assertRegex(f"PAY {new_reference()} X", MANDATE_REFERENCE)
+
+
+class CapabilityTests(SimpleTestCase):
+    def test_the_latest_change_per_capability_wins(self):
+        from contexts.governance.domain.capabilities import Capability, current
+        changes = [("approve_payout", True), ("correct_records", True), ("approve_payout", False)]
+        self.assertEqual(current(changes), {Capability.CORRECT_RECORDS})
+        self.assertEqual(current([]), frozenset())

@@ -7,9 +7,9 @@ from django.core.management.base import BaseCommand
 from django.db import DatabaseError, connection, transaction
 from django.utils import timezone
 
-from contexts.communities.public import Role, add_member, create_group
+from contexts.communities.public import add_member, create_group
 from contexts.custody import public as custody
-from contexts.governance.public import adopt_constitution, decide, propose_withdrawal, proposal_view
+from contexts.governance.public import Capability, adopt_constitution, decide, grant, propose_withdrawal, proposal_view
 from contexts.notifications.public import topics_since
 from contexts.shared_kernel.money import Money
 from contexts.tenancy.public import provision_tenant, tenant
@@ -17,14 +17,15 @@ from simulators.im_bank import bank
 from simulators.im_bank.connector import Faults, SimulatorConnector
 
 PEOPLE = [
-    ("0712000001", "Wanjiku Kamau", Role.CHAIR, "8000"),
-    ("0712000002", "Otieno Ouma", Role.TREASURER, "8000"),
-    ("0712000003", "Akinyi Njeri", Role.SECRETARY, "7000"),
-    ("0712000004", "Kiprono Cheruiyot", Role.MEMBER, "7000"),
-    ("0712000005", "Mutua Musyoka", Role.MEMBER, "6000"),
-    ("0712000006", "Halima Abdi", Role.MEMBER, "6000"),
+    ("0712000001", "Wanjiku Kamau", "Chair", "8000"),
+    ("0712000002", "Otieno Ouma", "Treasurer", "8000"),
+    ("0712000003", "Akinyi Njeri", "Secretary", "7000"),
+    ("0712000004", "Kiprono Cheruiyot", "", "7000"),
+    ("0712000005", "Mutua Musyoka", "", "6000"),
+    ("0712000006", "Halima Abdi", "", "6000"),
 ]
-RULES = {"approvals": [{"up_to": "20000", "approvers": "officials", "required": 2},
+SIGNATORY = (Capability.APPROVE_PAYOUT, Capability.CANCEL_PAYOUT, Capability.CORRECT_RECORDS)
+RULES = {"approvals": [{"up_to": "20000", "approvers": "designated", "required": 2},
                        {"up_to": None, "approvers": "members", "required": 4}],
          "bank_charges": "pro_rata", "interest": "pro_rata", "mandate_valid_days": 14}
 
@@ -63,7 +64,11 @@ class Command(BaseCommand):
         self.step("1. Onboarding: tenant, group, constitution, members, existing I&M Chama Account")
         group, fund = create_group(name, actor="operator")
         version = adopt_constitution(group.id, RULES, actor="operator")
-        members = {n: add_member(group.id, msisdn=m, name=n, role=r, actor="operator") for m, n, r, _ in PEOPLE}
+        members = {n: add_member(group.id, msisdn=m, name=n, title=t, actor="operator") for m, n, t, _ in PEOPLE}
+        for m, n, t, _ in PEOPLE:  # the constitution's officials get its powers; a title alone grants nothing
+            if t:
+                for c in SIGNATORY:
+                    grant(members[n].id, c, actor="operator")
         opening = Money("3000")
         for *_, b in PEOPLE:
             opening += Money(b)
@@ -93,7 +98,7 @@ class Command(BaseCommand):
         self.say(f"Received {result.new} missing line(s), ignored {result.duplicates} already seen")
         self.recon(run)
 
-        self.step("5. An official identifies the unknown payer, once")
+        self.step("5. A member granted correct_records identifies the unknown payer, once")
         line_id = self._line_from(ea.id, "254733444555")
         try:
             custody.attribute_payment(line_id, members["Otieno Ouma"].id, by=members["Otieno Ouma"].id)
@@ -102,7 +107,7 @@ class Command(BaseCommand):
         custody.attribute_payment(line_id, members["Otieno Ouma"].id, by=members["Akinyi Njeri"].id)
         self.say("JOHN OUMA (0733 444 555) pays for Otieno Ouma; remembered for next time")
 
-        self.step("6. Approved withdrawal: proposal, two officials approve, mandate, payment")
+        self.step("6. Approved withdrawal: proposal, two designated approvers approve, mandate, payment")
         p = propose_withdrawal(members["Otieno Ouma"].id, fund.id, amount="15000", purpose="Land search and survey fees",
                                payee_name="Ardhi Surveyors", payee_account="0799111222")
         decide(p.id, members["Wanjiku Kamau"].id, approve=True)
@@ -160,7 +165,7 @@ class Command(BaseCommand):
             self.say(f"{'ledger_journalentry':<26} rows visible to this group's tenant: {cur.fetchone()[0]}")
 
     def _line_from(self, ea_id, msisdn=None, reference=None):
-        """Find a statement line the way an official would: by what the bank showed."""
+        """Find a statement line the way the treasurer would: by what the bank showed."""
         for line in custody.statement_lines(ea_id):
             if (msisdn and line["counterparty_msisdn"] == msisdn) or (reference and reference in line["narration"]):
                 return line["id"]

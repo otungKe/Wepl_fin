@@ -2,9 +2,9 @@
 
 Each scenario is its own tenant (ADR-0009). Its helpers act inside that
 tenant; a test touching its data directly does so inside ``s.acting()``."""
-from contexts.communities.public import Role, add_member, create_group
+from contexts.communities.public import add_member, create_group
 from contexts.custody.public import link_external_account, sync as custody_sync
-from contexts.governance.public import decide, eligible_approvers, propose_withdrawal, proposal_view
+from contexts.governance.public import Capability, decide, eligible_approvers, grant, propose_withdrawal, proposal_view
 from contexts.ledger.public import fund_position, member_balances, trial_balance
 from contexts.shared_kernel.money import Money
 from contexts.tenancy.public import provision_tenant, tenant
@@ -12,16 +12,19 @@ from simulators.im_bank import bank
 from simulators.im_bank.connector import SimulatorConnector
 
 RULES = {
-    "approvals": [{"up_to": "20000", "approvers": "officials", "required": 2},
+    "approvals": [{"up_to": "20000", "approvers": "designated", "required": 2},
                   {"up_to": None, "approvers": "members", "required": 3}],
     "bank_charges": "pro_rata", "interest": "pro_rata",
 }
+# The pilot constitution names three officials and gives them these powers.
+# The titles are labels; the grants are what the software checks (ADR-0011).
+SIGNATORY = (Capability.APPROVE_PAYOUT, Capability.CANCEL_PAYOUT, Capability.CORRECT_RECORDS)
 PEOPLE = [
-    ("0712000001", "Wanjiku Kamau", Role.CHAIR),
-    ("0712000002", "Otieno Ouma", Role.TREASURER),
-    ("0712000003", "Akinyi Njeri", Role.SECRETARY),
-    ("0712000004", "Kiprono Cheruiyot", Role.MEMBER),
-    ("0712000005", "Mutua Musyoka", Role.MEMBER),
+    ("0712000001", "Wanjiku Kamau", "Chair", SIGNATORY),
+    ("0712000002", "Otieno Ouma", "Treasurer", SIGNATORY),
+    ("0712000003", "Akinyi Njeri", "Secretary", SIGNATORY),
+    ("0712000004", "Kiprono Cheruiyot", "", ()),
+    ("0712000005", "Mutua Musyoka", "", ()),
 ]
 
 
@@ -34,7 +37,11 @@ class Scenario:
         with self.acting():
             self.group, self.fund = create_group(name, actor="test")
             adopt_constitution(self.group.id, rules or RULES, actor="test")
-            self.m = [add_member(self.group.id, msisdn=n, name=nm, role=r, actor="test") for n, nm, r in people]
+            self.m = []
+            for n, nm, title, capabilities in people:
+                self.m.append(add_member(self.group.id, msisdn=n, name=nm, title=title, actor="test"))
+                for c in capabilities:
+                    grant(self.m[-1].id, c, actor="test")
             self.account = account
             bank.open_account(account, name, opening_balance)
             self.ea = link_external_account(self.fund.id, institution="I&M Bank Kenya", account_number=account,

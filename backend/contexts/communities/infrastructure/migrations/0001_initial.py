@@ -112,33 +112,9 @@ class Migration(migrations.Migration):
                 (
                     "role",
                     models.CharField(
-                        choices=[
-                            (
-                                contexts.communities.domain.membership.Role["CHAIR"],
-                                contexts.communities.domain.membership.Role["CHAIR"],
-                            ),
-                            (
-                                contexts.communities.domain.membership.Role[
-                                    "TREASURER"
-                                ],
-                                contexts.communities.domain.membership.Role[
-                                    "TREASURER"
-                                ],
-                            ),
-                            (
-                                contexts.communities.domain.membership.Role[
-                                    "SECRETARY"
-                                ],
-                                contexts.communities.domain.membership.Role[
-                                    "SECRETARY"
-                                ],
-                            ),
-                            (
-                                contexts.communities.domain.membership.Role["MEMBER"],
-                                contexts.communities.domain.membership.Role["MEMBER"],
-                            ),
-                        ],
-                        default=contexts.communities.domain.membership.Role["MEMBER"],
+                        choices=[("chair", "chair"), ("treasurer", "treasurer"), ("secretary", "secretary"),
+                                 ("member", "member")],  # historical: the Role enum was removed (ADR-0011)
+                        default="member",
                         max_length=20,
                     ),
                 ),

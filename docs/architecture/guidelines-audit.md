@@ -34,7 +34,7 @@ Audited 2026-09-30, against [engineering-guidelines.md](engineering-guidelines.m
 | 25 | Explicit security rules | Partly | Partly: approval, self-benefit, maker-checker and isolation rules are explicit and tested; boot guards refuse unsafe production settings; see the wepl-security skill |
 | 26 | Reads and writes may differ | Meets | Meets: queries are separate from commands |
 | 27 | Reports aren't the source of truth | Meets | Meets: reports derive from the journal |
-| 28 | Backoffice is a product surface | Not yet | Not yet: officials' corrections are application commands the backoffice will call |
+| 28 | Backoffice is a product surface | Not yet | Not yet: corrections by `correct_records` holders are application commands the backoffice will call |
 | 29 | Tests follow business boundaries | Partly | Meets: unit tests per domain, integration per context, cross-context suites |
 | 30 | Test failure paths | Partly | Meets for money paths: duplicate, retry, invalid state, unauthorized actor, wrong group, provider failure, crash and reprocess. Not yet: cross-process concurrency, database failover |
 | 31 | Observable | **No** | Partly: operation ids on audit, journal, outbox and reconciliation. Not yet: request ids, structured logs |

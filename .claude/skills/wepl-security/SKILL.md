@@ -1,7 +1,7 @@
 ---
 name: wepl-security
 description: Who may do what in Wepl_fin. Covers what is enforced today
-  (official-only corrections, no self-benefit, maker-checker, votes, group
+  (explicit capabilities, never titles; no self-benefit, maker-checker, votes, group
   isolation, append-only history, boot guards, log redaction), what is not
   built (login, KYC, operators), tenant isolation by row-level security,
   and the rules to follow when they
@@ -12,10 +12,22 @@ description: Who may do what in Wepl_fin. Covers what is enforced today
 # Wepl_fin security
 
 The standing rules are in `docs/architecture/engineering-guidelines.md`
-(rules 23–25, 30 and 32). ADR-0008 records the current authorization model.
+(rules 23–25, 30 and 32). ADR-0008 records the current authorization model;
+ADR-0011 separates membership, title and capability.
 Parts are adapted from the original WEPL repo's `wepl-security` skill; they
 are marked **(borrowed)** and describe how to build what does not exist here
 yet.
+
+## Membership, title, capability (ADR-0011)
+
+- **Membership** answers "is this person in this group" (ACTIVE or LEFT).
+- **Title** ("Chair", "Treasurer", blank) is a label. **Never check it.**
+- **Capability** answers "may they do this". Governance owns them
+  (`governance.public.grant`, `revoke`, `holds`, `holders`), append-only and
+  audited. Today: `approve_payout`, `cancel_payout`, `correct_records`.
+- A new permission is a new `Capability` added with the workflow that needs
+  it, and checked with `holds(...)`. Never add `if title == ...`, never
+  derive a capability from a title, and never add a role enum.
 
 ## What is enforced today
 
@@ -23,12 +35,14 @@ yet.
 
 | Rule | Where | Test |
 |---|---|---|
-| Voting eligibility: active member of the group; no vote by the proposer, payee or charged member; officials-only tiers | `governance/domain/voting.py` | `governance/tests/` |
+| Voting eligibility: active member of the group; no vote by the proposer, payee or charged member; "designated" tiers need `approve_payout` | `governance/domain/voting.py` | `governance/tests/` |
+| Cancelling someone else's withdrawal request needs `cancel_payout` | `governance/application/proposals.py` | `governance/tests/integration/test_capabilities.py` |
+| Capabilities are explicit grants, append-only, audited; a member who left holds none | `governance/application/capabilities.py` | same |
 | A vote cannot be changed; repeating the same vote is a no-op | `governance/application/proposals.py` | `governance/tests/` |
 | A payout needs a single-use mandate; anything else alerts every member | `governance/domain/mandate.py`, `custody/domain/matching.py` | `custody/tests/integration/test_ingestion.py` |
-| **Corrections need an active official of the account's group** | `custody/domain/authority.py` | `custody/tests/*/test_authority.py` |
+| **Corrections need an active member of the account's group holding `correct_records`**; a title grants nothing | `custody/domain/authority.py` | `custody/tests/*/test_authority.py` |
 | **No correction in your own favour** (attributing a payment to yourself) | same | same |
-| **Opening balances need two different officials** (maker-checker) | same | same |
+| **Opening balances need two different `correct_records` holders** (maker-checker) | same | same |
 | Nothing done in one group touches another group's money or decisions | application checks (ADR-0005) | `tests/test_isolation.py` |
 | **Tenant isolation by forced PostgreSQL row-level security**; fails closed without a context; cross-tenant access declared and audited | `contexts/tenancy`, `persistence/tenancy.py` (ADR-0009) | `tests/test_tenancy.py` |
 | **The app's database role cannot bypass RLS** | `tenancy.E001` system check | `tests/test_tenancy.py` |
@@ -39,7 +53,7 @@ yet.
 
 ### How a command names who is acting
 
-- **Member and official commands take a membership id:**
+- **Member commands take a membership id:**
   - voting uses `voter_id`;
   - proposing uses `proposer_id`;
   - corrections and opening balances use `by` and `confirmed_by`.
@@ -80,7 +94,7 @@ yet.
 |---|---|---|
 | Identifier | phone number (`identity.Msisdn`) | work email |
 | Credential | OTP, then a PIN | password provisioned by an admin, forced change, TOTP step-up |
-| Authorization | membership role in *this* group | capabilities (below) |
+| Authorization | capabilities granted in *this* group (ADR-0011) | operator capabilities (below) |
 
 - An operator is never a member and never votes.
 - Sign the two token families with **different keys** or distinguish them by
@@ -121,16 +135,18 @@ yet.
 - A new money command with a free-text `actor`.
 - Relaxing a boot guard, or making it conditional on anything but DEBUG.
 - Running the simulator with DEBUG off. There is no flag to allow it.
-- Letting an official correct in their own favour "because the group is
-  small": another official does it.
+- Letting a corrector correct in their own favour "because the group is
+  small": another holder does it.
+- Treating a title as a permission (ADR-0011).
 - Logging a payload that has not been redacted.
 - Checking authorization only in a frontend.
 
 ## Before you merge a change that decides who may act
 
 1. The pure rule is in a `domain/` module, with unit tests for each refusal.
-2. An integration test covers each unauthorized actor: an ordinary member, a
-   former official, another group's official, an unknown id, self-benefit.
+2. An integration test covers each unauthorized actor: an ordinary member,
+   a member with a title but no grant, a former holder, another group's
+   holder, an unknown id, self-benefit.
 3. Each refusal leaves nothing written. `Scenario.assert_sound` still holds.
 4. The audit record names the real actor.
 5. Record any new security rule or shortcut in an ADR, and add it to the

@@ -77,7 +77,7 @@ class LineResolution(models.Model):
 
 
 class PayerMapping(models.Model):
-    """Remembers who a payer is, so the treasurer is asked only once."""
+    """Remembers who a payer is, so nobody is asked twice."""
 
     tenant_scope = TenantScope.TENANT_SCOPED
     tenant = tenant_column()

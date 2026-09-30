@@ -1,13 +1,15 @@
 """Communities context.
 
-Owns: groups (chamas, welfare groups, collections), who belongs to them and in
-what role, and the funds a group keeps.
+Owns: groups (chamas, welfare groups, collections, and any other
+independently governed group), who belongs to them, the optional titles a
+group gives its members, and the funds a group keeps.
 
-Does not own: the group's rules and approvals (governance), what anyone is
+Does not own: the group's rules, approvals and what each member is allowed
+to do (governance: capabilities, ADR-0011), what anyone is
 owed (ledger), or where the money sits (custody).
 
-Groups belong to a tenant; row-level security isolates tenants and this
-context's checks keep groups apart within one (ADR-0005, ADR-0009).
+Each group is its own tenant (ADR-0010); row-level security keeps groups
+apart, and this context's checks stay as defence in depth (ADR-0005).
 
 Public surface: ``contexts.communities.public``.
 """

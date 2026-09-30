@@ -1,7 +1,8 @@
 """Governance context.
 
-Owns: each group's constitution (versioned rules), withdrawal proposals, the
-approvals members give, and the mandates that result. A mandate is the
+Owns: each group's constitution (versioned rules), the capabilities the
+group grants its members (what each may do, ADR-0011), withdrawal proposals,
+the approvals members give, and the mandates that result. A mandate is the
 group's authorisation for one payout; it can be executed once.
 
 Does not own: moving money (the custodian does, under custody's watch), who

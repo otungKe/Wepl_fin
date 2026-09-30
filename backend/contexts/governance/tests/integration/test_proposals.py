@@ -3,15 +3,15 @@ from django.db.utils import DatabaseError
 from django.test import TestCase
 
 from contexts.audit.public import history
-from contexts.communities.public import Role, add_member, create_group
+from contexts.communities.public import add_member, create_group
 from contexts.governance.infrastructure.models import Approval, Constitution, Mandate
 from contexts.governance.public import (GovernanceError, InvalidTransition, MandateStatus, ProposalStatus,
                                         adopt_constitution, cancel_proposal, decide, execute_mandate,
-                                        expire_mandates, propose_withdrawal)
+                                        expire_mandates, grant, propose_withdrawal)
 from contexts.shared_kernel.money import Money
-from tests.scenario import act_for_new_tenant
+from tests.scenario import SIGNATORY, act_for_new_tenant
 
-RULES = {"approvals": [{"up_to": "20000", "approvers": "officials", "required": 2},
+RULES = {"approvals": [{"up_to": "20000", "approvers": "designated", "required": 2},
                        {"up_to": None, "approvers": "members", "required": 3}]}
 
 
@@ -20,17 +20,20 @@ class ProposalTests(TestCase):
         act_for_new_tenant(self)
         self.group, self.fund = create_group("G", actor="t")
         adopt_constitution(self.group.id, RULES, actor="t")
-        roles = [Role.CHAIR, Role.TREASURER, Role.SECRETARY, Role.MEMBER, Role.MEMBER]
+        titles = ["Chair", "Treasurer", "Secretary", "", ""]
         self.chair, self.treasurer, self.secretary, self.m4, self.m5 = (
-            add_member(self.group.id, msisdn=f"07120000{i:02d}", name=f"P{i}", role=r, actor="t")
-            for i, r in enumerate(roles, 1))
+            add_member(self.group.id, msisdn=f"07120000{i:02d}", name=f"P{i}", title=t, actor="t")
+            for i, t in enumerate(titles, 1))
+        for m in (self.chair, self.treasurer, self.secretary):
+            for c in SIGNATORY:
+                grant(m.id, c, actor="t")
 
     def propose(self, amount="5000", proposer=None, **kw):
         kw.setdefault("payee_name", "Supplier")
         kw.setdefault("payee_account", "0799000000")
         return propose_withdrawal((proposer or self.treasurer).id, self.fund.id, amount=amount, purpose="x", **kw)
 
-    def test_two_officials_approve_and_a_mandate_is_issued(self):
+    def test_two_designated_approvers_approve_and_a_mandate_is_issued(self):
         p = self.propose()
         self.assertEqual(p.required_approvals, 2)
         self.assertEqual(decide(p.id, self.chair.id, approve=True).status, ProposalStatus.OPEN)
@@ -49,7 +52,7 @@ class ProposalTests(TestCase):
 
     def test_unauthorised_voters_are_refused(self):
         p = self.propose()
-        for voter, why in ((self.m4, "officials"), (self.treasurer, "request they made")):
+        for voter, why in ((self.m4, "designated approvers"), (self.treasurer, "request they made")):
             with self.assertRaisesMessage(GovernanceError, why):
                 decide(p.id, voter.id, approve=True)
         big = self.propose("50000", payee_account=self.chair.msisdn)
@@ -81,7 +84,7 @@ class ProposalTests(TestCase):
         with self.assertRaisesMessage(GovernanceError, "Not enough eligible"):
             self.propose(proposer=self.chair, charged_member_id=self.secretary.id)
 
-    def test_cancel_only_while_open_and_only_by_proposer_or_official(self):
+    def test_cancel_only_while_open_and_only_by_proposer_or_cancel_holder(self):
         p = self.propose()
         with self.assertRaisesMessage(GovernanceError, "Only the proposer"):
             cancel_proposal(p.id, self.m4.id)

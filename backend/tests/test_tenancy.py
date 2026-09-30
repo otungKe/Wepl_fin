@@ -16,7 +16,7 @@ from contexts.tenancy.contract import TenantScope
 from contexts.tenancy.infrastructure.session import database_tenant, role_bypasses_rls
 from contexts.tenancy.public import TenancyError, cross_tenant, current_tenant, tenant
 from simulators.im_bank import bank
-from tests.scenario import Scenario
+from tests.scenario import SIGNATORY, Scenario
 
 OURS = {"audit", "tenancy", "identity", "communities", "governance", "ledger", "custody", "notifications", "simulator"}
 
@@ -35,9 +35,9 @@ def sql(query, params=()):
 class RlsIsolationTests(TestCase):
     def setUp(self):
         self.a = Scenario("Tenant A", account="A1")
-        self.b = Scenario("Tenant B", account="B1", people=[("0722000001", "B1", "chair"),
-                                                           ("0722000002", "B2", "treasurer"),
-                                                           ("0722000003", "B3", "secretary")])
+        self.b = Scenario("Tenant B", account="B1", people=[("0722000001", "B1", "Chair", SIGNATORY),
+                                                           ("0722000002", "B2", "Treasurer", SIGNATORY),
+                                                           ("0722000003", "B3", "Secretary", SIGNATORY)])
         for s, acct in ((self.a, "A1"), (self.b, "B1")):
             for m in s.m:
                 bank.deposit(acct, "1000", msisdn=m.msisdn, name="X")
@@ -89,7 +89,7 @@ class RlsIsolationTests(TestCase):
             a_line = StatementLine.objects.get(amount=50).pk
             with self.assertRaisesMessage(CustodyError, "not in this group"):
                 attribute_payment(a_line, self.b.m[0].id, by=self.a.m[0].id)
-            with self.assertRaisesMessage(CustodyError, "unknown official"):
+            with self.assertRaisesMessage(CustodyError, "unknown member"):
                 attribute_payment(a_line, self.a.m[3].id, by=self.b.m[0].id)
             self.assertEqual(JournalEntry.objects.count(), before)
             self.assertNotIn(self.b.m[0].id, member_balances(self.b.fund.id))  # B's books read as empty

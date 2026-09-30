@@ -33,7 +33,7 @@ the questions still open with I&M.
    - **deposit.** `domain/attribution.attribute` looks for a member code in the
      reference or narration, then a remembered payer (`PayerMapping`), then
      the member's own number. Otherwise the money goes to `unattributed_in`
-     and the treasurer is asked once.
+     and a `correct_records` holder is asked once.
    - **interest / charge.** Shared pro rata by member balances, or retained,
      per the constitution (`ConstitutionRules.interest` / `bank_charges`).
    - **withdrawal.** `domain/matching.match_outflow`:
@@ -62,7 +62,7 @@ reconciles; the alert is the control, not the reconciliation.
   explained` via `explain_outflow`. Each is a new journal entry plus a new
   `LineResolution`.
 - **Opening balances come first.** They must be recorded before any other
-  line, with sequence 0. Anything the treasurer cannot account for goes to
+  line, with sequence 0. Anything the signers cannot account for goes to
   `unattributed_in`, never to a member.
 - **Group checks everywhere.** Every correction checks that the member or
   mandate belongs to the line's group and fund.

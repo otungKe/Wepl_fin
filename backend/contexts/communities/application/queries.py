@@ -18,7 +18,7 @@ def _views(rows) -> list[MembershipView]:
     rows = list(rows)
     who = people(r.person_id for r in rows)
     return [MembershipView(id=r.pk, group_id=r.group_id, person_id=r.person_id, msisdn=who[r.person_id].msisdn,
-                           name=who[r.person_id].name, role=r.role, status=r.status, code=r.member_code)
+                           name=who[r.person_id].name, title=r.title, status=r.status, code=r.member_code)
             for r in rows]
 
 
