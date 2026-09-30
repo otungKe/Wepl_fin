@@ -45,7 +45,7 @@ backend/
 docs/
   architecture/      overview, the engineering guidelines, and the audit against them
   adr/               architecture decision records
-.claude/skills/      agent skills: architecture, ledger, custody, testing
+.claude/skills/      agent skills: architecture, ledger, custody, testing, security
 ```
 
 Start with [docs/architecture/overview.md](docs/architecture/overview.md). The

@@ -13,6 +13,7 @@ from ..domain import accounting
 from ..domain.resolution import InvalidCorrection, Outcome, ensure_correction
 from ..infrastructure.models import Alert, ExternalAccount, LineResolution, PayerMapping, StatementLine
 from . import bookkeeping as bk
+from .authority import official
 
 
 def _locked_line(line_id: int) -> tuple[ExternalAccount, StatementLine]:
@@ -22,10 +23,12 @@ def _locked_line(line_id: int) -> tuple[ExternalAccount, StatementLine]:
 
 
 @transaction.atomic  # entry, resolution, payer memory and audit commit together
-def attribute_payment(line_id: int, membership_id: int, *, actor: str, remember_payer: bool = True) -> LineResolution:
-    """Credit an unattributed receipt to the member the treasurer names."""
+def attribute_payment(line_id: int, membership_id: int, *, by: int, remember_payer: bool = True) -> LineResolution:
+    """Credit an unattributed receipt to the member an official names. ``by``
+    is the official's membership id; nobody may credit themselves."""
+    ea, line = _locked_line(line_id)
+    actor = official(by, ea.group_id, beneficiaries=[membership_id]).msisdn
     with operation("custody.attribute_payment", actor=actor):
-        ea, line = _locked_line(line_id)
         member = membership(membership_id)
         if member.group_id != ea.group_id:
             raise CustodyError("That member belongs to another group.")
@@ -48,10 +51,12 @@ def attribute_payment(line_id: int, membership_id: int, *, actor: str, remember_
 
 
 @transaction.atomic  # the mandate claim, entry, resolution and alert closure commit together
-def explain_outflow(line_id: int, mandate_id: int, *, actor: str) -> LineResolution:
-    """Tie an unmatched payout to a mandate approved after the fact."""
+def explain_outflow(line_id: int, mandate_id: int, *, by: int) -> LineResolution:
+    """Tie an unmatched payout to a mandate approved after the fact. ``by`` is
+    the official's membership id; the mandate itself carries the group's approval."""
+    ea, line = _locked_line(line_id)
+    actor = official(by, ea.group_id).msisdn
     with operation("custody.explain_outflow", actor=actor):
-        ea, line = _locked_line(line_id)
         m = mandate(mandate_id)
         try:
             ensure_correction(bk.latest_outcome(line), Outcome.EXPLAINED)

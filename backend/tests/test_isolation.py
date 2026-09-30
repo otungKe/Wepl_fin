@@ -23,7 +23,7 @@ class CrossGroupTests(TestCase):
     def test_cannot_attribute_a_payment_to_another_groups_member(self):
         line = StatementLine.objects.get(amount=50)
         with self.assertRaisesMessage(CustodyError, "another group"):
-            attribute_payment(line.pk, self.b.m[0].id, actor="b-treasurer")
+            attribute_payment(line.pk, self.b.m[0].id, by=self.a.m[1].id)
 
     def test_cannot_explain_an_outflow_with_another_groups_mandate(self):
         bank.withdraw("A1", "100", narration="ATM")
@@ -33,7 +33,7 @@ class CrossGroupTests(TestCase):
         foreign = Mandate.objects.get(reference=self.b.approve("100", proposer=self.b.m[1]))
         line = StatementLine.objects.get(amount=100, kind="withdrawal")
         with self.assertRaisesMessage(CustodyError, "this fund"):
-            explain_outflow(line.pk, foreign.pk, actor="x")
+            explain_outflow(line.pk, foreign.pk, by=self.a.m[0].id)
 
     def test_cannot_propose_on_or_vote_in_another_group(self):
         with self.assertRaisesMessage(GovernanceError, "another group"):

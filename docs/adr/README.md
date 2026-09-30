@@ -9,6 +9,7 @@
 | [0005](0005-group-as-isolation-boundary.md) | The group is the data-isolation boundary until tenancy is decided | Proposed, open question |
 | [0006](0006-custody-detective-control.md) | Pilot custody: groups hold money at I&M; WEPL reconciles and alerts | Proposed |
 | [0007](0007-application-layer-uses-own-orm.md) | Shortcut: application code uses its own context's ORM models directly | Proposed, shortcut |
+| [0008](0008-who-may-act-before-login.md) | Only an active official may correct the books; opening balances need two; simulator refused in production | Proposed |
 
 All are **Proposed** until Harry accepts them. A separate proposal
 (`claude/project-thread-sdt0p6`, "ADR-0001: Stack") chose Django 6.0 with

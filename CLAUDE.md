@@ -11,7 +11,8 @@ the mandates that authorise payouts, and reconciliation against the custodian.
   - `wepl-architecture`: where code goes;
   - `wepl-ledger`: money rules;
   - `wepl-custody`: statements, matching, reconciliation;
-  - `wepl-testing`: how to prove it.
+  - `wepl-testing`: how to prove it;
+  - `wepl-security`: who may do what, what's enforced, and the rules for login.
 - **Commands:** run everything from `backend/`:
   - `python manage.py test`
   - `python manage.py makemigrations --check --dry-run`

@@ -30,8 +30,8 @@ Audited 2026-09-30, against [engineering-guidelines.md](engineering-guidelines.m
 | 21 | Providers behind interfaces | Partly | Meets: `Connector` and `Notifier` ports; implementation chosen by settings |
 | 22 | No provider language in the domain | Partly: `bank_txn_id` | Meets: `external_id`, provider detail in `metadata` |
 | 23 | Tenancy is a security boundary | **No** | Partly: group isolation enforced and tested; tenancy model is an open question (ADR-0005) |
-| 24 | Authorization is not authentication | Partly | Partly: business authorization (who may vote or cancel) is explicit; authentication not built |
-| 25 | Explicit security rules | Partly | Partly: approval, self-approval and isolation rules are explicit and tested |
+| 24 | Authorization is not authentication | Partly | Partly: business authorization is explicit for votes, cancellations and corrections (ADR-0008); authentication not built |
+| 25 | Explicit security rules | Partly | Partly: approval, self-benefit, maker-checker and isolation rules are explicit and tested; boot guards refuse unsafe production settings; see the wepl-security skill |
 | 26 | Reads and writes may differ | Meets | Meets: queries are separate from commands |
 | 27 | Reports aren't the source of truth | Meets | Meets: reports derive from the journal |
 | 28 | Backoffice is a product surface | Not yet | Not yet: officials' corrections are application commands the backoffice will call |

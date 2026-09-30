@@ -40,14 +40,14 @@ class ContributionTests(TestCase):
         self.s.sync()
         self.assertEqual(self.s.assert_sound(self).unattributed, Money("700"))
         line = line_where(amount=700)
-        attribute_payment(line.pk, self.s.m[2].id, actor="treasurer")
+        attribute_payment(line.pk, self.s.m[2].id, by=self.s.m[1].id)
         self.assertTrue(PayerMapping.objects.filter(msisdn="254733999999").exists())
         bank.deposit(N, "300", msisdn="0733999999", name="UNKNOWN")
         self.s.sync()
         self.assertEqual(self.s.balance_of(self.s.m[2]), Money("1000"))
         self.assertEqual(self.s.assert_sound(self).unattributed, Money("0"))
         with self.assertRaisesMessage(CustodyError, "Only unattributed"):
-            attribute_payment(line.pk, self.s.m[1].id, actor="treasurer")
+            attribute_payment(line.pk, self.s.m[1].id, by=self.s.m[0].id)
 
     def test_interest_and_charges_shared_pro_rata(self):
         bank.deposit(N, "3000", msisdn="0712000001", name="A")
@@ -107,7 +107,7 @@ class WithdrawalTests(TestCase):
         self.assertEqual(self.s.assert_sound(self).unexplained_out, Money("2500"))
         self.assertTrue(run.balanced)  # the books agree with the bank; the alert is the control
         ref = self.s.approve("2500")
-        explain_outflow(alert.line_id, Mandate.objects.get(reference=ref).pk, actor="chair")
+        explain_outflow(alert.line_id, Mandate.objects.get(reference=ref).pk, by=self.s.m[0].id)
         alert.refresh_from_db()
         self.assertIsNotNone(alert.resolved_at)
         self.assertEqual(self.s.assert_sound(self).unexplained_out, Money("0"))
@@ -143,10 +143,10 @@ class WithdrawalTests(TestCase):
         line = line_where(amount=900)
         wrong = Mandate.objects.get(reference=self.s.approve("800"))
         with self.assertRaisesMessage(CustodyError, "exactly this amount"):
-            explain_outflow(line.pk, wrong.pk, actor="chair")
+            explain_outflow(line.pk, wrong.pk, by=self.s.m[0].id)
         deposit_line = line_where(amount=1000)
         with self.assertRaisesMessage(CustodyError, "Only unmatched"):
-            explain_outflow(deposit_line.pk, wrong.pk, actor="chair")
+            explain_outflow(deposit_line.pk, wrong.pk, by=self.s.m[0].id)
 
     def test_statement_history_is_append_only(self):
         for action in (lambda: StatementLine.objects.update(amount=1), lambda: LineResolution.objects.all().delete()):
@@ -159,7 +159,8 @@ class OnboardingAndReportTests(TestCase):
     def test_opening_balances_with_remainder_unattributed(self):
         s = Scenario(opening_balance="10000.00")
         record_opening_balances(s.ea.id, statement_balance="10000.00",
-                                member_balances={s.m[0].id: "4000", s.m[1].id: "5000"}, actor="treasurer")
+                                member_balances={s.m[0].id: "4000", s.m[1].id: "5000"}, by=s.m[1].id,
+                                confirmed_by=s.m[0].id)
         bank.deposit(N, "100", msisdn=s.m[0].msisdn, name="A")
         _, run = s.sync()
         self.assertTrue(run.balanced, run)
@@ -172,7 +173,9 @@ class OnboardingAndReportTests(TestCase):
     def test_opening_balances_are_checked(self):
         s = Scenario(opening_balance="100.00")
         with self.assertRaisesMessage(CustodyError, "more than the bank"):
-            record_opening_balances(s.ea.id, statement_balance="100", member_balances={s.m[0].id: "200"}, actor="t")
+            record_opening_balances(s.ea.id, statement_balance="100", member_balances={s.m[0].id: "200"}, by=s.m[1].id,
+                                    confirmed_by=s.m[0].id)
         other = Scenario("Other", account="777")
         with self.assertRaisesMessage(CustodyError, "another group"):
-            record_opening_balances(s.ea.id, statement_balance="100", member_balances={other.m[0].id: "50"}, actor="t")
+            record_opening_balances(s.ea.id, statement_balance="100", member_balances={other.m[0].id: "50"}, by=s.m[1].id,
+                                    confirmed_by=s.m[0].id)

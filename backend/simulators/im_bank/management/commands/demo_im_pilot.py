@@ -64,10 +64,11 @@ class Command(BaseCommand):
         bank.open_account(number, name, opening.amount)
         ea = custody.link_external_account(fund.id, institution="I&M Bank Kenya", account_number=number,
                                            account_name=name, connector="im_simulator", actor="operator")
-        custody.record_opening_balances(ea.id, statement_balance=opening.amount, actor="treasurer",
+        custody.record_opening_balances(ea.id, statement_balance=opening.amount, by=members["Otieno Ouma"].id,
+                                        confirmed_by=members["Wanjiku Kamau"].id,
                                         member_balances={members[n].id: b for _, n, _, b in PEOPLE})
         self.say(f"{name}: {len(members)} members, constitution v{version}, {ea}")
-        self.say(f"Opening balance {opening}: members' balances signed off by the treasurer; "
+        self.say(f"Opening balance {opening}: members' balances signed off by the treasurer and the chair; "
                  f"KES 3,000 nobody can account for is held as unattributed")
 
         self.step("2. Contributions through paybill 542542 (one payer is not a member)")
@@ -86,9 +87,13 @@ class Command(BaseCommand):
         self.say(f"Received {result.new} missing line(s), ignored {result.duplicates} already seen")
         self.recon(run)
 
-        self.step("5. Treasurer identifies the unknown payer, once")
+        self.step("5. An official identifies the unknown payer, once")
         line_id = self._line_from(ea.id, "254733444555")
-        custody.attribute_payment(line_id, members["Otieno Ouma"].id, actor="treasurer")
+        try:
+            custody.attribute_payment(line_id, members["Otieno Ouma"].id, by=members["Otieno Ouma"].id)
+        except custody.CustodyError as exc:
+            self.say(f"Treasurer crediting their own account: refused ({exc})")
+        custody.attribute_payment(line_id, members["Otieno Ouma"].id, by=members["Akinyi Njeri"].id)
         self.say("JOHN OUMA (0733 444 555) pays for Otieno Ouma; remembered for next time")
 
         self.step("6. Approved withdrawal: proposal, two officials approve, mandate, payment")

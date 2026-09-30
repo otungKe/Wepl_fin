@@ -4,12 +4,17 @@ import logging
 from django.conf import settings
 from django.utils.module_loading import import_string
 
+from ..domain.redaction import for_log
+
 log = logging.getLogger("wepl.notify")
 
 
 class LogNotifier:
+    """Stand-in while SMS is on hold. Logs are not a private channel, so
+    phone numbers and names are masked; the outbox row keeps the full message."""
+
     def deliver(self, topic: str, payload: dict) -> None:
-        log.info("NOTIFY %s %s", topic, payload)
+        log.info("NOTIFY %s %s", topic, for_log(payload))
 
 
 class MemoryNotifier:

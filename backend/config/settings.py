@@ -29,8 +29,11 @@ INSTALLED_APPS = [
 ]
 
 # The simulated I&M bank, for tests and the investor demo. No context imports
-# it; production deployments set WEPL_ENABLE_SIMULATOR=0.
+# it. It fakes a bank, so it must never run beside real money: with DEBUG off
+# the process refuses to start unless WEPL_ENABLE_SIMULATOR=0.
 WEPL_ENABLE_SIMULATOR = os.environ.get("WEPL_ENABLE_SIMULATOR", "1") == "1"
+if not DEBUG and WEPL_ENABLE_SIMULATOR:
+    raise RuntimeError("WEPL_ENABLE_SIMULATOR must be 0 when DEBUG is off.")
 if WEPL_ENABLE_SIMULATOR:
     INSTALLED_APPS.append("simulators.im_bank.apps.ImBankSimulatorConfig")
 
