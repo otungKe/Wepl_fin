@@ -7,6 +7,11 @@
 - **Evidence:** code, migrations 0001–0008, triggers, tests, and probe runs
   against a real PostgreSQL 16 as `wepl_app` (the application role, which
   row-level security binds).
+- **Status:** Harry said "Implement" on 2026-09-30. B1–B5 and tests 1–8 of
+  section I are in: migration `communities 0009`, `memberships.py`, and tests
+  in `communities/tests/integration/test_membership.py` and
+  `custody/tests/integration/test_returning_member.py`. C1 (the same check
+  for every child table) still needs its ADR.
 
 ## A. What is correct
 

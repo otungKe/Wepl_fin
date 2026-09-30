@@ -3,7 +3,10 @@ returned as M06. Everything recorded against M04 stays M04's."""
 from django.test import TestCase
 
 from contexts.communities.public import add_member, leave_group
-from contexts.custody.infrastructure.models import PayerMapping, StatementLine
+from contexts.custody.infrastructure.models import LineResolution, PayerMapping, StatementLine
+from contexts.governance.infrastructure.models import CapabilityChange
+from contexts.ledger.infrastructure.models import JournalEntry, JournalLine
+from contexts.notifications.infrastructure.models import OutboxEvent
 from contexts.custody.public import attribute_payment, group_summary
 from contexts.shared_kernel.money import Money
 from simulators.im_bank import bank
@@ -55,6 +58,24 @@ class ReturningMemberTests(TestCase):
         self.s.sync()
         self.assertEqual(self.s.balance_of(self.new), Money("500"))
         self.s.assert_sound(self)
+
+
+class LeavingRecordsOnlyTheEndOfTheSpellTests(TestCase):
+    """Leaving is a membership fact (review H): it posts no money, sends
+    nothing, and rewrites no grant. What it means for the balance is the
+    constitution's rule (ADR-0014), not leave_group's."""
+
+    def test_leaving_writes_nothing_outside_the_membership_and_its_audit(self):
+        s = Scenario()
+        with s.acting():
+            bank.deposit(N, "1000", msisdn="254712000001", name="WANJIKU K", reference=f"{N} M01")
+            s.sync()
+            tables = (JournalEntry, JournalLine, LineResolution, OutboxEvent, CapabilityChange, PayerMapping)
+            before = {t.__name__: t.objects.count() for t in tables}
+            leave_group(s.m[0].id, actor="test")  # a signatory with a balance
+            self.assertEqual({t.__name__: t.objects.count() for t in tables}, before)
+        self.assertEqual(s.balance_of(s.m[0]), Money("1000"))
+        s.assert_sound(self)
 
 
 class LeaverSharingTests(TestCase):

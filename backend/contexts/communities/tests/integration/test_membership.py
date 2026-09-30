@@ -10,7 +10,8 @@ from contexts.communities.infrastructure.models import Fund, Group, Membership
 from contexts.communities.public import (CommunityError, add_member, create_group, leave_group, members,
                                          open_fund, set_title)
 from contexts.governance.public import Capability, capabilities_of, grant
-from contexts.tenancy.public import tenant
+from contexts.identity.infrastructure.models import Person
+from contexts.tenancy.public import TenancyError, cross_tenant, tenant
 from tests.scenario import act_for_new_group
 
 
@@ -130,6 +131,24 @@ class MembershipTests(TestCase):
         set_title(m.id, None, actor="t")
         self.assertEqual(Membership.objects.get(pk=m.id).title, "")
 
+    def test_an_ended_spells_title_is_history(self):
+        m = self.add(1, title="Treasurer")
+        leave_group(m.id, actor="t")
+        with self.assertRaisesMessage(CommunityError, "has ended"):
+            set_title(m.id, "Chair", actor="t")
+        self.assertEqual(Membership.objects.get(pk=m.id).title, "Treasurer")
+
+    def test_a_returning_member_starts_without_a_title(self):
+        old = self.add(1, title="Treasurer")
+        leave_group(old.id, actor="t")
+        self.assertEqual(self.add(1).title, "")
+        self.assertEqual(self.add(2, title="Chair").title, "Chair")
+
+    def test_an_unknown_member_is_a_community_error(self):
+        for use_case in (lambda: set_title(999999, "X", actor="t"), lambda: leave_group(999999, actor="t")):
+            with self.subTest(use_case), self.assertRaisesMessage(CommunityError, "Unknown member"):
+                use_case()
+
     def test_an_overlong_title_is_refused(self):
         with self.assertRaisesMessage(CommunityError, "at most"):
             self.add(1, title="x" * 61)
@@ -158,6 +177,60 @@ class DatabaseAllocatesCodesTests(TestCase):
         for n in range(2, 100):
             add_member(self.group.id, msisdn=f"0713{n:06d}", name="P", actor="t")
         self.assertEqual(add_member(self.group.id, msisdn="0712000003", name="P", actor="t").code, "M100")
+
+
+class TenantBoundaryTests(TestCase):
+    """A membership lives in its group's tenant, whoever writes it (review B1, B2)."""
+
+    def setUp(self):
+        self.a = create_group("A", actor="t")
+        self.b = create_group("B", actor="t")
+        with tenant(self.b.tenant_id):
+            self.b_member = add_member(self.b.id, msisdn="0712000009", name="B1", actor="t")
+
+    def counters(self):
+        with cross_tenant("test: read both counters", actor="t"):
+            return {g.id: g.last_member_sequence for g in Group.objects.filter(pk__in=(self.a.id, self.b.id))}
+
+    def test_a_foreign_group_is_refused_and_nothing_is_written(self):
+        before, people = self.counters(), Person.objects.count()
+        with tenant(self.a.tenant_id), self.assertRaisesMessage(CommunityError, "Unknown group"):
+            add_member(self.b.id, msisdn="0712000001", name="Stranger", actor="t")
+        self.assertEqual(self.counters(), before)
+        self.assertEqual(Person.objects.count(), people)  # the person rolled back with the join
+
+    def test_a_foreign_membership_is_unknown(self):
+        with tenant(self.a.tenant_id):
+            for use_case in (lambda: set_title(self.b_member.id, "X", actor="t"),
+                             lambda: leave_group(self.b_member.id, actor="t")):
+                with self.subTest(use_case), self.assertRaisesMessage(CommunityError, "Unknown member"):
+                    use_case()
+        with tenant(self.b.tenant_id):
+            self.assertEqual(Membership.objects.get(pk=self.b_member.id).status, "active")
+
+    def test_the_database_refuses_a_foreign_group_inside_a_tenant(self):
+        from contexts.identity.public import register_person
+        person = register_person("0712000001", "X").id
+        with tenant(self.a.tenant_id), self.assertRaises(DatabaseError), transaction.atomic():
+            Membership.objects.create(group_id=self.b.id, person_id=person, member_code="M02")
+
+    def test_the_database_refuses_a_membership_outside_its_groups_tenant(self):
+        from contexts.identity.public import register_person
+        person = register_person("0712000001", "X").id
+        with cross_tenant("test: write across tenants", actor="t"):
+            with self.assertRaisesMessage(DatabaseError, "belongs to its group's tenant"), transaction.atomic():
+                Membership.objects.create(group_id=self.b.id, person_id=person, member_code="M02",
+                                          tenant_id=self.a.tenant_id)
+            ok = Membership.objects.create(group_id=self.b.id, person_id=person, member_code="M02",
+                                           tenant_id=self.b.tenant_id)
+            self.assertEqual(ok.member_code, "M02")
+
+    def test_no_tenant_context_is_a_tenancy_error(self):
+        for use_case in (lambda: add_member(self.a.id, msisdn="0712000001", name="P", actor="t"),
+                         lambda: set_title(self.b_member.id, "X", actor="t"),
+                         lambda: leave_group(self.b_member.id, actor="t")):
+            with self.subTest(use_case), self.assertRaisesMessage(TenancyError, "needs a tenant context"):
+                use_case()
 
 
 class FoundingTests(TestCase):
