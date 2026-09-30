@@ -32,3 +32,25 @@ class OutboxTests(TestCase):
         self.assertEqual(deliver_pending(notifier=flaky), 1)
         self.assertEqual(flaky.sent, [("t", {"a": 1})])
         self.assertEqual(deliver_pending(notifier=flaky), 0)  # delivered once only
+
+    def test_provider_is_called_outside_any_transaction(self):
+        from django.db import connection
+
+        seen = []
+
+        class Probe(MemoryNotifier):
+            def deliver(self, topic, payload):
+                seen.append(len(connection.atomic_blocks))
+
+        notify("t", {"a": 1})
+        baseline = len(connection.atomic_blocks)  # TestCase's own wrapping
+        deliver_pending(notifier=Probe())
+        self.assertEqual(seen, [baseline])
+
+    def test_an_expired_lease_is_reclaimed(self):
+        from django.utils import timezone
+        notify("t", {"a": 1})
+        OutboxEvent.objects.update(claimed_until=timezone.now() + timezone.timedelta(minutes=5), attempts=1)
+        self.assertEqual(deliver_pending(notifier=MemoryNotifier()), 0)  # another worker holds it
+        OutboxEvent.objects.update(claimed_until=timezone.now() - timezone.timedelta(seconds=1))
+        self.assertEqual(deliver_pending(notifier=MemoryNotifier()), 1)

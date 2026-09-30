@@ -98,6 +98,20 @@ class ContextShapeTests(SimpleTestCase):
                if (n := len(p.read_text().splitlines())) > 250]
         self.assertEqual(big, [])
 
+    def test_no_mutable_money_counters(self):
+        """Balances are derived from the journal, never kept in a column."""
+        import re
+        shape = re.compile(r"\w*(amount|balance|total|paid|shares)\w*\s*=\s*F\(", re.I)
+        found = [f"{p.relative_to(ROOT)}: {line.strip()}" for p in source_files(CONTEXTS)
+                 for line in p.read_text().splitlines() if shape.search(line)]
+        self.assertEqual(found, [])
+
+    def test_every_adr_is_indexed(self):
+        adr_dir = ROOT.parent / "docs" / "adr"
+        index = (adr_dir / "README.md").read_text()
+        missing = [p.name for p in adr_dir.glob("[0-9]*.md") if p.name not in index]
+        self.assertEqual(missing, [])
+
     def test_no_business_workflows_in_signals(self):
         """Rule 14."""
         users = [str(p.relative_to(ROOT)) for p in source_files(CONTEXTS)

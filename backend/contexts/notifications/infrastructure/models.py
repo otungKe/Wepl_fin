@@ -9,6 +9,7 @@ class OutboxEvent(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     delivered_at = models.DateTimeField(null=True, blank=True)
     attempts = models.PositiveSmallIntegerField(default=0)
+    claimed_until = models.DateTimeField(null=True, blank=True)
     last_error = models.TextField(blank=True, default="")
 
     class Meta:

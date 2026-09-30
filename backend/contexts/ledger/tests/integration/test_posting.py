@@ -33,9 +33,13 @@ class PostingTests(TestCase):
         self.assertTrue(fund_position(1).invariant_holds)
         self.assertEqual(trial_balance(1), 0)
 
-    def test_same_key_same_entry_is_a_no_op(self):
-        self.assertEqual(post_journal(draft("same")), post_journal(draft("same")))
-        self.assertEqual(account_balance(CASH), Money("100"))
+    def test_distinct_keys_accumulate_and_a_replay_changes_nothing(self):
+        """An idempotency test must tell "same key again" from "two keys"."""
+        first = post_journal(draft("a"))
+        post_journal(draft("b"))
+        self.assertEqual(account_balance(CASH), Money("200"))
+        self.assertEqual(post_journal(draft("a")), first)
+        self.assertEqual(account_balance(CASH), Money("200"))
 
     def test_same_key_different_entry_is_refused(self):
         post_journal(draft("same", "100"))
