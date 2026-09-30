@@ -4,17 +4,17 @@ from django.db import DatabaseError, transaction
 from django.test import TestCase
 
 from contexts.audit.public import history
-from contexts.communities.infrastructure.models import Group, Membership
+from contexts.communities.infrastructure.models import Fund, Group, Membership
 from contexts.communities.public import (CommunityError, add_member, create_group, leave_group, members,
-                                         set_title)
+                                         open_fund, set_title)
 from contexts.governance.public import Capability, capabilities_of, grant
-from tests.scenario import act_for_new_tenant
+from contexts.tenancy.public import tenant
+from tests.scenario import act_for_new_group
 
 
 class MembershipTests(TestCase):
     def setUp(self):
-        act_for_new_tenant(self)
-        self.group, _ = create_group("G", actor="t")
+        self.group, _ = act_for_new_group(self)
 
     def add(self, n, **kw):
         return add_member(self.group.id, msisdn=f"07120000{n:02d}", name=f"P{n}", actor="t", **kw)
@@ -109,3 +109,49 @@ class MembershipTests(TestCase):
     def test_an_overlong_title_is_refused(self):
         with self.assertRaisesMessage(CommunityError, "at most"):
             self.add(1, title="x" * 61)
+
+
+class DatabaseAllocatesCodesTests(TestCase):
+    """PostgreSQL takes the next sequence on every insert, whoever inserts (ADR-0013)."""
+
+    def setUp(self):
+        self.group, _ = act_for_new_group(self)
+        self.person = add_member(self.group.id, msisdn="0712000001", name="P1", actor="t").person_id
+
+    def insert(self, code, msisdn="0712000002"):
+        from contexts.identity.public import register_person
+        person = register_person(msisdn, "X").id
+        return Membership.objects.create(group_id=self.group.id, person_id=person, member_code=code)
+
+    def test_a_direct_insert_must_take_the_next_code(self):
+        for wrong in ("M01", "M03", "M99", "X02"):
+            with self.subTest(wrong), self.assertRaises(DatabaseError), transaction.atomic():
+                self.insert(wrong)
+        self.assertEqual(self.insert("M02").member_code, "M02")
+        self.assertEqual(Group.objects.get(pk=self.group.id).last_member_sequence, 2)
+
+    def test_the_format_the_database_expects_is_the_domains(self):
+        Group.objects.filter(pk=self.group.id).update(last_member_sequence=99)
+        self.assertEqual(add_member(self.group.id, msisdn="0712000003", name="P", actor="t").code, "M100")
+
+
+class FoundingTests(TestCase):
+    def test_a_group_may_exist_without_a_fund_and_open_several(self):
+        group = create_group("Welfare circle", actor="t")
+        self.enterContext(tenant(group.tenant_id))
+        self.assertFalse(Fund.objects.exists())
+        names = [open_fund(group.id, name=n, actor="t").name for n in ("Main savings", "Welfare")]
+        self.assertEqual(names, ["Main savings", "Welfare"])
+        with self.assertRaisesMessage(CommunityError, "already has a fund"):
+            open_fund(group.id, name="Welfare", actor="t")
+        self.assertIn("fund.opened", [e["action"] for e in history(target_type="fund",
+                                                                    target_id=Fund.objects.first().pk)])
+
+    def test_founding_is_refused_inside_a_tenant(self):
+        group = create_group("First", actor="t")
+        with tenant(group.tenant_id), self.assertRaisesMessage(CommunityError, "outside any tenant"):
+            create_group("Nested", actor="t")
+
+    def test_a_group_needs_a_name(self):
+        with self.assertRaisesMessage(CommunityError, "needs a name"):
+            create_group("   ", actor="t")

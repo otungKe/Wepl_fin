@@ -6,7 +6,7 @@ from ..infrastructure.models import Fund, Group, Membership
 
 def group_view(group_id: int) -> GroupView:
     g = Group.objects.get(pk=group_id)
-    return GroupView(id=g.pk, name=g.name, segment=g.segment)
+    return GroupView(id=g.pk, tenant_id=g.tenant_id, name=g.name)
 
 
 def fund_view(fund_id: int) -> FundView:

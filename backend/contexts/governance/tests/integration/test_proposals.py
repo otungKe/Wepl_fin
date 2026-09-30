@@ -3,13 +3,13 @@ from django.db.utils import DatabaseError
 from django.test import TestCase
 
 from contexts.audit.public import history
-from contexts.communities.public import add_member, create_group
+from contexts.communities.public import add_member
 from contexts.governance.infrastructure.models import Approval, Constitution, Mandate
 from contexts.governance.public import (GovernanceError, InvalidTransition, MandateStatus, ProposalStatus,
                                         adopt_constitution, cancel_proposal, decide, execute_mandate,
                                         expire_mandates, grant, propose_withdrawal)
 from contexts.shared_kernel.money import Money
-from tests.scenario import SIGNATORY, act_for_new_tenant
+from tests.scenario import SIGNATORY, act_for_new_group
 
 RULES = {"approvals": [{"up_to": "20000", "approvers": "designated", "required": 2},
                        {"up_to": None, "approvers": "members", "required": 3}]}
@@ -17,8 +17,7 @@ RULES = {"approvals": [{"up_to": "20000", "approvers": "designated", "required":
 
 class ProposalTests(TestCase):
     def setUp(self):
-        act_for_new_tenant(self)
-        self.group, self.fund = create_group("G", actor="t")
+        self.group, self.fund = act_for_new_group(self)
         adopt_constitution(self.group.id, RULES, actor="t")
         titles = ["Chair", "Treasurer", "Secretary", "", ""]
         self.chair, self.treasurer, self.secretary, self.m4, self.m5 = (

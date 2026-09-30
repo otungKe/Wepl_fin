@@ -151,7 +151,9 @@ explicit tenant context → application checks → PostgreSQL RLS (forced) → d
   with RLS deliberately widened (`tests/test_isolation.py`).
 - **A group is a tenant (ADR-0010, accepted).**
   - Exactly one group per tenant: the database refuses a second.
-  - Provision the tenant, then create the group inside it.
+  - `create_group` founds the group *and* its tenant in one transaction,
+    outside any tenant (ADR-0013). Never provision a tenant and then create
+    a group inside it.
   - Institutions, providers, SACCOs and WEPL-direct *relate to* tenants;
     they are never tenants by default.
   - Institution access, when built, is an explicit grant: per tenant, per

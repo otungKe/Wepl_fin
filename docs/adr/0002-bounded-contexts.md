@@ -16,7 +16,7 @@ other's models directly, and kept rules in `services.py` files.
 | Context | Owns | Does not own |
 |---|---|---|
 | `identity` | People and phone numbers | Roles in groups; authentication (later) |
-| `communities` | Groups, memberships and roles, funds | Rules, approvals, balances, custody |
+| `communities` | Groups (each founds its own tenant, ADR-0013), memberships and titles, funds | Rules, approvals, balances, custody |
 | `governance` | Constitutions, proposals, approvals, mandates | Moving money, balances, members |
 | `ledger` | Accounts, journal entries, derived balances | Why money moved; who anyone is |
 | `custody` | Custodian accounts, statement lines, how each was accounted for, alerts, reconciliation | The money, mandates, the journal |

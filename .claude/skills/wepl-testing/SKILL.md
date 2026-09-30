@@ -44,7 +44,8 @@ creating rows by hand.
 - **Direct calls and ORM reads need the context.** Wrap them in
   `with s.acting():`, or call `self.enterContext(s.acting())` at the end of
   `setUp`.
-- **Tests without a scenario** use `act_for_new_tenant(self)`.
+- **Tests without a scenario** use `act_for_new_group(self)` (a group, its
+  tenant and one fund), or `act_for_new_tenant(self)` when no group is needed.
 - **Build every scenario before entering a context.** Provisioning inside a
   tenant is refused.
 - **Choose the layer you are testing.**

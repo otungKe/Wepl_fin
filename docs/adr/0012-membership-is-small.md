@@ -32,7 +32,10 @@ belong elsewhere and stay there.
 | Why keep it at all? | The pilot compares segments: pilot plan V5, "Which segment is strongest?", and the pivot rule "narrow to that segment". | **CONFIRMED** |
 | Is it one value per group? | The template offers a single choice. A group that is really two kinds is not covered. | **INFERRED** |
 
-**Change:** `Segment` moves to `communities/domain/group.py`, next to the
+**Superseded by [ADR-0013](0013-founding-a-group.md):** `Segment` was then
+removed from the core model altogether; the pilot tracker keeps it.
+
+**Change (at the time):** `Segment` moves to `communities/domain/group.py`, next to the
 group it describes. Its docstring says it is a pilot comparison label and
 that no rule may branch on it. Nothing else changes: no fund- or
 contribution-level category is added, because no workflow needs one yet.

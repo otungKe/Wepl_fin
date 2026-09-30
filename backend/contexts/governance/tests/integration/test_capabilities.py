@@ -5,20 +5,19 @@ from django.test import TestCase
 
 from contexts.audit.public import history
 from contexts.communities.infrastructure.models import Membership
-from contexts.communities.public import add_member, create_group
+from contexts.communities.public import add_member
 from contexts.governance.infrastructure.models import CapabilityChange
 from contexts.governance.public import (Capability, GovernanceError, adopt_constitution, cancel_proposal,
                                         capabilities_of, eligible_approvers, grant, holders, holds,
                                         propose_withdrawal, revoke)
-from tests.scenario import act_for_new_tenant
+from tests.scenario import act_for_new_group
 
 RULES = {"approvals": [{"up_to": None, "approvers": "designated", "required": 1}]}
 
 
 class CapabilityTests(TestCase):
     def setUp(self):
-        act_for_new_tenant(self)
-        self.group, self.fund = create_group("G", actor="t")
+        self.group, self.fund = act_for_new_group(self)
         adopt_constitution(self.group.id, RULES, actor="t")
         self.chair = add_member(self.group.id, msisdn="0712000001", name="Chair", title="Chair", actor="t")
         self.a = add_member(self.group.id, msisdn="0712000002", name="A", actor="t")

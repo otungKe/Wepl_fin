@@ -7,12 +7,12 @@ from django.core.management.base import BaseCommand
 from django.db import DatabaseError, connection, transaction
 from django.utils import timezone
 
-from contexts.communities.public import add_member, create_group
+from contexts.communities.public import add_member, create_group, open_fund
 from contexts.custody import public as custody
 from contexts.governance.public import Capability, adopt_constitution, decide, grant, propose_withdrawal, proposal_view
 from contexts.notifications.public import topics_since
 from contexts.shared_kernel.money import Money
-from contexts.tenancy.public import provision_tenant, tenant
+from contexts.tenancy.public import tenant
 from simulators.im_bank import bank
 from simulators.im_bank.connector import Faults, SimulatorConnector
 
@@ -55,14 +55,14 @@ class Command(BaseCommand):
         started = timezone.now()
         number = "01" + started.strftime("%y%m%d%H%M%S")
         name = f"Umoja Savings Group {number[-6:]}"
-        tenant_id = provision_tenant(name, actor="operator").id  # the group is the tenant (ADR-0010)
-        with tenant(tenant_id):
-            self.pilot(name, number, started, seed)
-        self.isolation(tenant_id, number)
+        group = create_group(name, actor="operator")  # founding the group establishes its tenant (ADR-0013)
+        with tenant(group.tenant_id):
+            self.pilot(group, name, number, started, seed)
+        self.isolation(group.tenant_id, number)
 
-    def pilot(self, name, number, started, seed):
-        self.step("1. Onboarding: tenant, group, constitution, members, existing I&M Chama Account")
-        group, fund = create_group(name, actor="operator")
+    def pilot(self, group, name, number, started, seed):
+        self.step("1. Onboarding: group (its own tenant), fund, constitution, members, existing I&M Chama Account")
+        fund = open_fund(group.id, name="Main savings", actor="operator")
         version = adopt_constitution(group.id, RULES, actor="operator")
         members = {n: add_member(group.id, msisdn=m, name=n, title=t, actor="operator") for m, n, t, _ in PEOPLE}
         for m, n, t, _ in PEOPLE:  # the constitution's officials get its powers; a title alone grants nothing
@@ -155,7 +155,7 @@ class Command(BaseCommand):
 
     def isolation(self, tenant_id, number):
         self.step("12. Another group (another tenant) sees nothing of this group, even with raw SQL")
-        neighbour = provision_tenant("Neighbouring group", actor="operator").id
+        neighbour = create_group("Neighbouring group", actor="operator").tenant_id
         with tenant(neighbour), connection.cursor() as cur:
             for table in ("ledger_journalentry", "custody_statementline", "communities_membership"):
                 cur.execute(f"SELECT count(*) FROM {table}")

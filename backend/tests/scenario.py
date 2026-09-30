@@ -2,7 +2,7 @@
 
 Each scenario is its own tenant (ADR-0009). Its helpers act inside that
 tenant; a test touching its data directly does so inside ``s.acting()``."""
-from contexts.communities.public import add_member, create_group
+from contexts.communities.public import add_member, create_group, open_fund
 from contexts.custody.public import link_external_account, sync as custody_sync
 from contexts.governance.public import Capability, decide, eligible_approvers, grant, propose_withdrawal, proposal_view
 from contexts.ledger.public import fund_position, member_balances, trial_balance
@@ -31,11 +31,12 @@ PEOPLE = [
 class Scenario:
     def __init__(self, name="Umoja Savings Group", *, rules=None, people=PEOPLE, account="0012345678901",
                  opening_balance="0.00"):
-        """A group is a tenant (ADR-0010): each scenario provisions its own."""
+        """A group is a tenant (ADR-0010): founding it establishes its own."""
         from contexts.governance.public import adopt_constitution
-        self.tenant_id = provision_tenant(name, actor="test").id
+        self.group = create_group(name, actor="test")
+        self.tenant_id = self.group.tenant_id
         with self.acting():
-            self.group, self.fund = create_group(name, actor="test")
+            self.fund = open_fund(self.group.id, actor="test")
             adopt_constitution(self.group.id, rules or RULES, actor="test")
             self.m = []
             for n, nm, title, capabilities in people:
@@ -94,6 +95,13 @@ class Scenario:
             if line["kind"] == "withdrawal":
                 tc.assertTrue(line["outcome"] in ("matched", "explained") or line["id"] in alerted, line)
         return pos
+
+
+def act_for_new_group(testcase, name="G"):
+    """Found a group with one fund, and act for it until the test ends."""
+    group = create_group(name, actor="test")
+    testcase.enterContext(tenant(group.tenant_id))
+    return group, open_fund(group.id, actor="test")
 
 
 def act_for_new_tenant(testcase, name="Test tenant") -> int:

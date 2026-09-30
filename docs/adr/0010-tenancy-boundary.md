@@ -150,8 +150,8 @@ unless a future, explicitly documented business requirement establishes another 
 ## Implementation notes (not part of Harry's text)
 
 - **One group per tenant is a database rule.** `communities_group.tenant_id`
-  is unique. Onboarding provisions the group's tenant, then creates the
-  group inside it. A second group in the same tenant is refused by
+  is unique. Founding a group establishes its tenant in the same transaction
+  (ADR-0013); there is no "enter a tenant, then create a group". A second group in the same tenant is refused by
   PostgreSQL, so "group = application-only partition" cannot creep back in.
 - **Keeping groups apart is RLS's job now.** The application checks that tie
   member, fund, mandate and line to one group stay as defence in depth.

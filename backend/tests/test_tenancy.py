@@ -1,12 +1,14 @@
 """Tenant isolation enforced by PostgreSQL row-level security (ADR-0009,
 foundational decisions 2–8). These tests go around the application on
 purpose, with raw SQL and the ORM, to show the database itself refuses."""
+from unittest import mock
+
 from django.apps import apps
 from django.db import DatabaseError, connection, transaction
 from django.test import TestCase
 
 from contexts.audit.infrastructure.models import AuditEvent
-from contexts.communities.public import CommunityError, create_group
+from contexts.communities.public import CommunityError, create_group, group_view
 from contexts.custody.infrastructure.models import StatementLine
 from contexts.custody.public import CustodyError, attribute_payment
 from contexts.governance.infrastructure.models import Mandate
@@ -59,7 +61,7 @@ class RlsIsolationTests(TestCase):
             with self.subTest(table):
                 self.assertEqual(sql(f"SELECT count(*) FROM {table}")[0][0], 0)
         with self.assertRaises(DatabaseError), transaction.atomic():
-            sql("INSERT INTO communities_group (name, segment, created_at) VALUES ('x', 'savings', now())")
+            sql("INSERT INTO communities_group (name, created_at) VALUES ('x', now())")
 
     def test_raw_sql_cannot_read_change_or_delete_another_tenants_rows(self):
         with self.b.acting():
@@ -74,7 +76,7 @@ class RlsIsolationTests(TestCase):
 
     def test_a_row_cannot_be_written_into_another_tenant(self):
         with self.a.acting(), self.assertRaisesMessage(DatabaseError, "row-level security"), transaction.atomic():
-            sql("INSERT INTO communities_group (tenant_id, name, segment, created_at) VALUES (%s, 'x', 'savings', now())",
+            sql("INSERT INTO communities_group (tenant_id, name, created_at) VALUES (%s, 'x', now())",
                 [self.b.tenant_id])
         with self.a.acting(), self.assertRaisesMessage(DatabaseError, "row-level security"), transaction.atomic():
             sql("UPDATE communities_membership SET tenant_id = %s", [self.b.tenant_id])
@@ -131,14 +133,28 @@ class GroupIsTenantTests(TestCase):
     def test_a_tenant_holds_exactly_one_group(self):
         s = Scenario()
         with s.acting():
-            with self.assertRaisesMessage(CommunityError, "already has its group"):
+            with self.assertRaisesMessage(CommunityError, "outside any tenant"):
                 create_group("Second group", actor="test")
             with self.assertRaisesMessage(DatabaseError, "community_one_group_per_tenant"), transaction.atomic():
-                sql("INSERT INTO communities_group (name, segment, created_at) VALUES ('x', 'savings', now())")
+                sql("INSERT INTO communities_group (name, created_at) VALUES ('x', now())")
 
-    def test_a_group_cannot_be_created_outside_a_tenant(self):
-        with self.assertRaisesMessage(TenancyError, "needs a tenant context"):
-            create_group("Nowhere", actor="test")
+    def test_founding_a_group_establishes_its_own_tenant(self):
+        """ADR-0013: not "enter a tenant, then create a group inside it"."""
+        group = create_group("Founded", actor="test")
+        self.assertIsNotNone(group.tenant_id)
+        self.assertIsNone(current_tenant())
+        with tenant(group.tenant_id):
+            self.assertEqual(group_view(group.id).tenant_id, group.tenant_id)
+        self.assertNotEqual(create_group("Another", actor="test").tenant_id, group.tenant_id)
+
+    def test_a_failed_founding_leaves_no_tenant_behind(self):
+        with cross_tenant("count tenants", actor="test"):
+            before = sql("SELECT count(*) FROM tenancy_tenant")[0][0]
+        with mock.patch("contexts.communities.application.groups.record", side_effect=RuntimeError("audit down")):
+            with self.assertRaises(RuntimeError):
+                create_group("Doomed", actor="test")
+        with cross_tenant("count tenants", actor="test"):
+            self.assertEqual(sql("SELECT count(*) FROM tenancy_tenant")[0][0], before)
 
 
 class DatabaseShapeTests(TestCase):

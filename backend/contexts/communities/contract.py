@@ -1,9 +1,8 @@
 from dataclasses import dataclass
 
-from .domain.group import Segment
 from .domain.membership import MembershipStatus
 
-__all__ = ["CommunityError", "FundView", "GroupView", "MembershipView", "MembershipStatus", "Segment"]
+__all__ = ["CommunityError", "FundView", "GroupView", "MembershipView", "MembershipStatus"]
 
 
 class CommunityError(ValueError):
@@ -13,8 +12,8 @@ class CommunityError(ValueError):
 @dataclass(frozen=True)
 class GroupView:
     id: int
+    tenant_id: int  # the group's own tenant identity: the group is the tenant (ADR-0010)
     name: str
-    segment: str
 
 
 @dataclass(frozen=True)

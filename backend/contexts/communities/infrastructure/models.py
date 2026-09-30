@@ -4,7 +4,6 @@ from django.db.models import Q
 from contexts.tenancy.contract import TenantScope
 from persistence.tenancy import tenant_column
 
-from ..domain.group import Segment
 from ..domain.membership import TITLE_MAX, MembershipStatus
 
 
@@ -14,7 +13,6 @@ class Group(models.Model):
     tenant_scope = TenantScope.TENANT_SCOPED
     tenant = tenant_column()
     name = models.CharField(max_length=120)
-    segment = models.CharField(max_length=20, choices=[(s, s) for s in Segment], default=Segment.SAVINGS)
     # The last member sequence handed out. Only ever increases (0006), so a
     # member code is never allocated twice, whatever happens to memberships.
     last_member_sequence = models.PositiveIntegerField(default=0, db_default=0)

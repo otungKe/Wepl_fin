@@ -137,7 +137,7 @@ command given one fails the same way as for an unknown id, and writes nothing.
 **Each independently governed group is its own tenant** (Harry, ADR-0010).
 - `communities_group.tenant_id` is unique, so a tenant holds exactly one
   group, and PostgreSQL refuses a second.
-- Onboarding provisions the tenant, then creates the group inside it.
+- Founding a group establishes its tenant in the same transaction (ADR-0013).
 - Institutions are *relationships* to tenants, never tenants by default.
   When they are built, their access will be an explicit grant that is
   per-tenant, per-purpose and audited, not `cross_tenant()`.
