@@ -1,0 +1,62 @@
+"""Ledger persistence. Append-only and balance-checked by PostgreSQL (0002)."""
+from django.db import models
+from django.db.models import Q
+
+from ..domain.accounts import AccountPurpose, Side
+
+SIDES = [(s.value, s.name.title()) for s in Side]
+
+
+class Account(models.Model):
+    purpose = models.CharField(max_length=20, choices=[(p.value, p.name) for p in AccountPurpose])
+    group_id = models.BigIntegerField()
+    fund_id = models.BigIntegerField()
+    member_id = models.BigIntegerField(null=True, blank=True)
+    external_account_id = models.BigIntegerField(null=True, blank=True)
+    currency = models.CharField(max_length=3, default="KES")
+    normal_side = models.CharField(max_length=1, choices=SIDES)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["fund_id", "purpose", "member_id", "external_account_id", "currency"],
+                                    nulls_distinct=False, name="ledger_account_unique_key"),
+            models.CheckConstraint(condition=Q(purpose="member_interest", member_id__isnull=False)
+                                   | (~Q(purpose="member_interest") & Q(member_id__isnull=True)),
+                                   name="ledger_member_interest_has_member"),
+            models.CheckConstraint(condition=Q(purpose="custody_cash", external_account_id__isnull=False)
+                                   | (~Q(purpose="custody_cash") & Q(external_account_id__isnull=True)),
+                                   name="ledger_custody_cash_has_external_account"),
+        ]
+
+
+class JournalEntry(models.Model):
+    idempotency_key = models.CharField(max_length=160, unique=True)
+    fingerprint = models.TextField()
+    group_id = models.BigIntegerField()
+    fund_id = models.BigIntegerField()
+    kind = models.CharField(max_length=40)
+    memo = models.CharField(max_length=255, blank=True, default="")
+    cause_type = models.CharField(max_length=60)
+    cause_id = models.CharField(max_length=64)
+    operation_id = models.CharField(max_length=64, blank=True, default="")
+    reverses = models.OneToOneField("self", null=True, blank=True, on_delete=models.PROTECT,
+                                    related_name="reversed_by")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [models.Index(fields=["fund_id", "id"]), models.Index(fields=["cause_type", "cause_id"])]
+
+
+class JournalLine(models.Model):
+    entry = models.ForeignKey(JournalEntry, on_delete=models.PROTECT, related_name="lines")
+    account = models.ForeignKey(Account, on_delete=models.PROTECT, related_name="lines")
+    side = models.CharField(max_length=1, choices=SIDES)
+    amount = models.DecimalField(max_digits=18, decimal_places=2)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(condition=Q(amount__gt=0), name="ledger_line_amount_positive"),
+            models.CheckConstraint(condition=Q(side__in=["D", "C"]), name="ledger_line_side_valid"),
+        ]
+        indexes = [models.Index(fields=["account", "entry"])]

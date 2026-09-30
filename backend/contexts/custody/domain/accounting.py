@@ -1,0 +1,126 @@
+"""The accounting decision for each thing that happens at the custodian.
+
+Business event -> accounting decision (here) -> journal (ledger). Each
+function returns a ``JournalDraft``; the ledger checks it and posts it.
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+from contexts.governance.contract import Allocation, SharingRule
+from contexts.ledger.contract import AccountKey, AccountPurpose, JournalDraft, Side
+from contexts.shared_kernel.money import Money
+
+D, C = Side.DEBIT, Side.CREDIT
+
+
+class AccountingError(ValueError):
+    pass
+
+
+@dataclass(frozen=True)
+class FundBook:
+    """The ledger accounts of one fund held at one custodian account."""
+
+    group_id: int
+    fund_id: int
+    external_account_id: int
+    currency: str = "KES"
+
+    def _key(self, purpose, **kw) -> AccountKey:
+        return AccountKey(group_id=self.group_id, fund_id=self.fund_id, purpose=purpose, currency=self.currency, **kw)
+
+    def cash(self) -> AccountKey:
+        return self._key(AccountPurpose.CUSTODY_CASH, external_account_id=self.external_account_id)
+
+    def member(self, member_id: int) -> AccountKey:
+        return self._key(AccountPurpose.MEMBER_INTEREST, member_id=member_id)
+
+    def unattributed(self) -> AccountKey:
+        return self._key(AccountPurpose.UNATTRIBUTED_IN)
+
+    def unexplained(self) -> AccountKey:
+        return self._key(AccountPurpose.UNEXPLAINED_OUT)
+
+    def retained(self) -> AccountKey:
+        return self._key(AccountPurpose.RETAINED)
+
+    def draft(self, key: str, kind: str, cause_id, postings, memo: str = "") -> JournalDraft:
+        return JournalDraft.build(idempotency_key=key, group_id=self.group_id, fund_id=self.fund_id, kind=kind,
+                                  cause_type="custody.statement_line", cause_id=str(cause_id), postings=postings,
+                                  memo=memo)
+
+
+def share_pro_rata(amount: Money, member_ids: list[int], balances: dict[int, Money]) -> dict[int, Money]:
+    """Split by members' current balances; equally if nobody holds anything."""
+    if not member_ids:
+        raise AccountingError("The group has no active members to share this among.")
+    weights = {m: max(balances.get(m, Money.zero(amount.currency)).amount, 0) for m in member_ids}
+    return amount.allocate(weights)
+
+
+def receipt(book: FundBook, *, key: str, line_id: int, amount: Money, member_id: int | None) -> JournalDraft:
+    credit = book.member(member_id) if member_id else book.unattributed()
+    kind = "contribution" if member_id else "unattributed_receipt"
+    return book.draft(key, kind, line_id, [(book.cash(), D, amount), (credit, C, amount)])
+
+
+def interest(book: FundBook, *, key: str, line_id: int, amount: Money, rule: SharingRule, member_ids: list[int],
+             balances: dict[int, Money]) -> JournalDraft:
+    if rule is SharingRule.RETAINED:
+        credits = [(book.retained(), C, amount)]
+    else:
+        credits = [(book.member(m), C, a) for m, a in share_pro_rata(amount, member_ids, balances).items()]
+    return book.draft(key, "interest", line_id, [(book.cash(), D, amount), *credits])
+
+
+def charge(book: FundBook, *, key: str, line_id: int, amount: Money, rule: SharingRule, member_ids: list[int],
+           balances: dict[int, Money]) -> JournalDraft:
+    if rule is SharingRule.RETAINED:
+        debits = [(book.retained(), D, amount)]
+    else:
+        debits = [(book.member(m), D, a) for m, a in share_pro_rata(amount, member_ids, balances).items()]
+    return book.draft(key, "bank_charge", line_id, [*debits, (book.cash(), C, amount)])
+
+
+def _mandate_debits(book, amount, allocation, charged_member_id, member_ids, balances):
+    if allocation is Allocation.MEMBER:
+        return [(book.member(charged_member_id), D, amount)]
+    return [(book.member(m), D, a) for m, a in share_pro_rata(amount, member_ids, balances).items()]
+
+
+def authorised_payout(book: FundBook, *, key: str, line_id: int, amount: Money, allocation: Allocation,
+                      charged_member_id: int | None, member_ids: list[int], balances: dict[int, Money],
+                      reference: str) -> JournalDraft:
+    debits = _mandate_debits(book, amount, allocation, charged_member_id, member_ids, balances)
+    return book.draft(key, "withdrawal", line_id, [*debits, (book.cash(), C, amount)], memo=reference)
+
+
+def unexplained_payout(book: FundBook, *, key: str, line_id: int, amount: Money) -> JournalDraft:
+    return book.draft(key, "unexplained_outflow", line_id, [(book.unexplained(), D, amount), (book.cash(), C, amount)])
+
+
+def payer_identified(book: FundBook, *, key: str, line_id: int, amount: Money, member_id: int) -> JournalDraft:
+    return book.draft(key, "attribution", line_id, [(book.unattributed(), D, amount), (book.member(member_id), C, amount)])
+
+
+def payout_explained(book: FundBook, *, key: str, line_id: int, amount: Money, allocation: Allocation,
+                     charged_member_id: int | None, member_ids: list[int], balances: dict[int, Money],
+                     reference: str) -> JournalDraft:
+    debits = _mandate_debits(book, amount, allocation, charged_member_id, member_ids, balances)
+    return book.draft(key, "outflow_explained", line_id, [*debits, (book.unexplained(), C, amount)], memo=reference)
+
+
+def opening_balances(book: FundBook, *, key: str, line_id: int, statement_balance: Money,
+                     signed_off: dict[int, Money]) -> JournalDraft:
+    """Bring an existing account in: members get what the treasurer signed
+    off; anything in the bank nobody can account for is held as unattributed."""
+    total = Money.zero(book.currency)
+    for amount in signed_off.values():
+        total += amount
+    if total > statement_balance:
+        raise AccountingError("Member balances add up to more than the bank balance.")
+    credits = [(book.member(m), C, a) for m, a in signed_off.items() if a.is_positive]
+    return book.draft(key, "opening", line_id, [(book.cash(), D, statement_balance), *credits,
+                                                (book.unattributed(), C, statement_balance - total)],
+                      memo="Opening balances")

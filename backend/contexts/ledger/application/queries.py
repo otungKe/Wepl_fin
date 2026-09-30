@@ -1,0 +1,60 @@
+"""Balances are always derived from journal lines, never stored."""
+from decimal import Decimal
+
+from django.db.models import Case, DecimalField, F, Sum, Value, When
+
+from contexts.shared_kernel.money import Money
+
+from ..domain.accounts import AccountKey, AccountPurpose, Side
+from ..domain.position import FundPosition
+from ..infrastructure import accounts
+from ..infrastructure.models import JournalLine
+
+_DEC = DecimalField(max_digits=18, decimal_places=2)
+_SIGNED = Sum(Case(When(side=F("account__normal_side"), then=F("amount")), default=-F("amount"), output_field=_DEC))
+
+
+def account_balance(key: AccountKey) -> Money:
+    acct = accounts.find(key)
+    total = JournalLine.objects.filter(account=acct).aggregate(v=_SIGNED)["v"] if acct else None
+    return Money(total or 0, key.currency)
+
+
+def member_balances(fund_id: int, currency: str = "KES") -> dict[int, Money]:
+    rows = (JournalLine.objects.filter(account__fund_id=fund_id, account__purpose=AccountPurpose.MEMBER_INTEREST,
+                                       account__currency=currency)
+            .values("account__member_id").annotate(v=_SIGNED))
+    return {r["account__member_id"]: Money(r["v"] or 0, currency) for r in rows}
+
+
+def fund_position(fund_id: int, currency: str = "KES") -> FundPosition:
+    rows = (JournalLine.objects.filter(account__fund_id=fund_id, account__currency=currency)
+            .values("account__purpose").annotate(v=_SIGNED))
+    by = {r["account__purpose"]: Money(r["v"] or 0, currency) for r in rows}
+    get = lambda p: by.get(p.value, Money.zero(currency))
+    return FundPosition(cash=get(AccountPurpose.CUSTODY_CASH), member_interests=get(AccountPurpose.MEMBER_INTEREST),
+                        unattributed=get(AccountPurpose.UNATTRIBUTED_IN), retained=get(AccountPurpose.RETAINED),
+                        unexplained_out=get(AccountPurpose.UNEXPLAINED_OUT))
+
+
+def trial_balance(fund_id: int | None = None) -> Decimal:
+    """Total debits minus total credits: zero whenever the ledger is sound."""
+    qs = JournalLine.objects.all() if fund_id is None else JournalLine.objects.filter(account__fund_id=fund_id)
+    agg = qs.aggregate(
+        d=Sum(Case(When(side=Side.DEBIT.value, then=F("amount")), default=Value(0), output_field=_DEC)),
+        c=Sum(Case(When(side=Side.CREDIT.value, then=F("amount")), default=Value(0), output_field=_DEC)))
+    return (agg["d"] or Decimal(0)) - (agg["c"] or Decimal(0))
+
+
+def member_movements(fund_id: int, member_id: int) -> list[dict]:
+    """One member's movements in a fund, oldest first, with a running balance."""
+    rows = (JournalLine.objects.filter(account__fund_id=fund_id, account__purpose=AccountPurpose.MEMBER_INTEREST,
+                                       account__member_id=member_id)
+            .select_related("entry", "account").order_by("entry_id", "id"))
+    running, out = Decimal("0.00"), []
+    for r in rows:
+        credit = r.side == Side.CREDIT.value
+        running += r.amount if credit else -r.amount
+        out.append({"entry_id": r.entry_id, "date": r.entry.created_at, "kind": r.entry.kind, "memo": r.entry.memo,
+                    "in": r.amount if credit else None, "out": None if credit else r.amount, "balance": running})
+    return out
