@@ -66,10 +66,13 @@ class LedgerRaceTests(unittest.TestCase):
             self.assertIn("different entry", str(e))
 
     def test_racing_first_use_of_an_account_creates_it_once(self):
-        member = self.key(AccountPurpose.MEMBER_INTEREST, member_id=4242)
+        from contexts.communities.public import add_member
+        with tenant(self.group.tenant_id):
+            member_id = add_member(self.group.id, msisdn="0700004242", name="Racer", actor="test").id
+        member = self.key(AccountPurpose.MEMBER_INTEREST, member_id=member_id)
         ids = []
         errors = run_together(lambda n: ids.append(resolve(member).pk), self.group.tenant_id)
         self.assertEqual(errors, [])
         self.assertEqual(len(set(ids)), 1)
         with tenant(self.group.tenant_id):
-            self.assertEqual(Account.objects.filter(fund_id=self.fund.id, member_id=4242).count(), 1)
+            self.assertEqual(Account.objects.filter(fund_id=self.fund.id, member_id=member_id).count(), 1)

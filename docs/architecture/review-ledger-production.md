@@ -292,3 +292,30 @@ reproduced finding, not a hypothetical:
    settings.
 6. **Restore drills.** A backup must be shown to restore with every trigger
    and policy intact, then pass `check_ledger_integrity`. Not yet done.
+
+### Update, 2026-10-01: ADR-0017 built
+
+Blocker 1 above is closed. Harry said "lets build ADR-0017".
+
+**What is now enforced:**
+- **Composite keys:** all 30 keys between tenant-scoped tables include the
+  tenant.
+- **Plain-id checks:** the 6 plain-id links are checked by triggers. Each is
+  installed by the context that already depends on the other one.
+- **Probes:** `tests/test_linked_rows.py` repeats every probed write. Each is
+  now refused, both inside a tenant and inside a cross-tenant operation.
+- **Guard test:** the build fails if a new key between tenant-scoped tables
+  leaves out the tenant.
+
+**Evidence the probes test this rule:**
+- With the four migrations held back, the probe tests fail (8 failures,
+  4 errors).
+- With the migrations in place, every refusal names an ADR-0017 key or
+  check.
+
+**Other checks:**
+- The existing demo data passed every new key check when migrated.
+- The migrations reverse cleanly.
+
+Blockers 2–6 stand.
+

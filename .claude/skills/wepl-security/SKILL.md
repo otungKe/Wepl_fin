@@ -46,6 +46,7 @@ yet.
 | Nothing done in one group touches another group's money or decisions | application checks (ADR-0005) | `tests/test_isolation.py` |
 | **Tenant isolation by forced PostgreSQL row-level security**; fails closed without a context; cross-tenant access declared and audited | `contexts/tenancy`, `persistence/tenancy.py` (ADR-0009) | `tests/test_tenancy.py` |
 | **The app's database role cannot bypass RLS** | `tenancy.E001` system check | `tests/test_tenancy.py` |
+| **A row only ever refers to rows of its own tenant**, for any role in any mode (foreign keys ignore RLS, so the tenant is part of every key) | composite keys and plain-id checks (ADR-0017) | `tests/test_linked_rows.py` |
 | Financial and audit history cannot be edited or deleted, even with SQL | PostgreSQL triggers (ADR-0003) | ledger, custody and audit tests |
 | Every business action has an audit record with an operation id | `audit.public.record` / `operation` | throughout |
 | **Refuse to boot** with DEBUG off and the dev secret, or with DEBUG off and the simulated bank | `config/settings.py` | `tests/test_settings_guards.py` |

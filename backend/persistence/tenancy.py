@@ -55,3 +55,38 @@ def tenant_scoped(table: str, *, system_rows: bool = False) -> tuple[str, str]:
     {'' if system_rows else f'ALTER TABLE {table} ALTER COLUMN tenant_id DROP NOT NULL;'}
     """
     return forward, reverse
+
+
+# ADR-0017: a row and every row it refers to belong to the same tenant.
+# Foreign key checks ignore row-level security, so the tenant must be part of
+# the key itself.
+
+def tenant_keyed(table: str) -> tuple[str, str]:
+    """(forward, reverse) SQL: let other rows refer to (id, tenant_id)."""
+    return (f"ALTER TABLE {table} ADD CONSTRAINT {table}_id_tenant UNIQUE (id, tenant_id);",
+            f"ALTER TABLE {table} DROP CONSTRAINT IF EXISTS {table}_id_tenant;")
+
+
+def same_tenant(table: str, column: str, parent: str) -> tuple[str, str]:
+    """(forward, reverse) SQL: ``table.column`` may only name a ``parent`` row
+    of the same tenant, in any mode, for any role. Deferred like Django's own
+    keys. A null reference is not checked, as with any foreign key."""
+    name = f"{table}_{column}_same_tenant"
+    return (f"""ALTER TABLE {table} ADD CONSTRAINT {name} FOREIGN KEY ({column}, tenant_id)
+                REFERENCES {parent} (id, tenant_id) DEFERRABLE INITIALLY DEFERRED;""",
+            f"ALTER TABLE {table} DROP CONSTRAINT IF EXISTS {name};")
+
+
+def no_existing_violations(check: str, message: str) -> str:
+    """SQL that stops a migration if existing rows break a rule a new trigger
+    will enforce only for new rows. It looks across every tenant."""
+    return f"""
+    DO $$
+    BEGIN
+        PERFORM set_config('app.cross_tenant', 'on', true);
+        IF EXISTS ({check}) THEN
+            RAISE EXCEPTION '{message}: existing rows break ADR-0017; fix them first';
+        END IF;
+        PERFORM set_config('app.cross_tenant', '', true);
+    END $$;
+    """

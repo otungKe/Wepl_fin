@@ -1,11 +1,14 @@
 # ADR-0017: A row and every row it refers to belong to the same tenant
 
-- **Status:** Proposed (2026-10-01). Harry asked for this record: "relationships
-  crossing bounded contexts must preserve tenant and group ownership
-  consistently, without creating inappropriate direct dependencies between
-  contexts." It follows from the membership review (C1).
-- **Not yet implemented.** This records the rule, the mechanism and the work
-  list.
+- **Status:** Accepted and implemented (Harry, 2026-10-01: "lets build
+  ADR-0017"). Harry asked for this record: "relationships crossing bounded
+  contexts must preserve tenant and group ownership consistently, without
+  creating inappropriate direct dependencies between contexts." It follows
+  from the membership review (C1).
+- **Implemented in:** ledger 0008, communities 0013, governance 0006,
+  custody 0005 (helpers in `persistence/tenancy.py`). The guard and the
+  probes are in `tests/test_linked_rows.py`. Every write in the probe table
+  below is now refused, inside a tenant and inside a cross-tenant operation.
 
 ## Context
 
@@ -26,7 +29,7 @@ raw ORM writes. Every one of these was **accepted**:
 | Both of the above | inside a declared cross-tenant operation |
 | A ledger entry in tenant A naming B's group and B's fund | inside tenant A, through `post_journal` |
 
-Nothing **reads** across the boundary afterwards. Tenant A's row is still
+(Before ADR-0017 was implemented.) Nothing **reads** across the boundary afterwards. Tenant A's row is still
 invisible to B, and B's rows are still invisible to A. But the row is
 wrong: it claims a relationship with another group's member or fund.
 

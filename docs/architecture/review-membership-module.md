@@ -11,7 +11,7 @@
   section I are in: migration `communities 0009`, `memberships.py`, and tests
   in `communities/tests/integration/test_membership.py` and
   `custody/tests/integration/test_returning_member.py`. C1 (the same check
-  for every child table) still needs its ADR.
+  for every child table) is ADR-0017, implemented on 2026-10-01.
 
 ## A. What is correct
 

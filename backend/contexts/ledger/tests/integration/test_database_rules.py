@@ -136,14 +136,18 @@ class ResolveTests(TestCase):
                 entry = self.a.raw_entry("a2", tenant_id=self.a.group.tenant_id)
                 JournalLine.objects.create(entry=entry, account=b_out, side="D", amount=5, tenant_id=entry.tenant_id)
 
-    def test_p4_one_tenants_account_never_blocks_anothers(self):
+    def test_p4_a_key_naming_another_tenants_fund_is_refused(self):
+        """Before ADR-0017 a mistaken key in A wrote an account in A naming B's
+        fund (harmless to B, because keys are unique per tenant). Now the
+        database refuses that account outright, and B is unaffected."""
         key = self.b.key(AccountPurpose.UNATTRIBUTED_IN)
         with tenant(self.a.group.tenant_id):
-            in_a = resolve(key)  # a mistaken key in A only ever writes to A
+            with self.assertRaisesMessage(IntegrityError, "not its tenant"):
+                resolve(key)
+            self.assertFalse(Account.objects.filter(fund_id=self.b.fund.id).exists())
         with tenant(self.b.group.tenant_id):
             in_b = resolve(key)
             self.assertEqual(resolve(key).pk, in_b.pk)
-        self.assertNotEqual(in_a.pk, in_b.pk)
 
     def test_an_account_of_another_group_is_a_ledger_error(self):
         with tenant(self.a.group.tenant_id):

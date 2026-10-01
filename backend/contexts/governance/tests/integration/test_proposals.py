@@ -91,11 +91,22 @@ class ProposalTests(TestCase):
         with self.assertRaises(InvalidTransition):
             cancel_proposal(p.id, self.chair.id)
 
+    def statement_lines(self, n):
+        from django.utils import timezone
+        from contexts.custody.infrastructure.models import StatementLine
+        from contexts.custody.public import link_external_account
+        ea = link_external_account(self.fund.id, institution="I&M Bank Kenya", account_number=f"G{self.fund.id}",
+                                   account_name="G", connector="upload", actor="t")
+        return [StatementLine.objects.create(external_account_id=ea.id, external_id=f"t{i}", sequence=i,
+                                             posted_at=timezone.now(), kind="withdrawal", amount=100).pk
+                for i in range(n)]
+
     def test_mandate_executes_once_and_expires(self):
         p = decide(decide(self.propose().id, self.chair.id, approve=True).id, self.secretary.id, approve=True)
         m = Mandate.objects.get(reference=p.mandate_reference)
-        self.assertTrue(execute_mandate(m.pk, line_id=1, when=m.issued_at))
-        self.assertFalse(execute_mandate(m.pk, line_id=2, when=m.issued_at))
+        first, second = self.statement_lines(2)  # an executed mandate names a real line (ADR-0017)
+        self.assertTrue(execute_mandate(m.pk, line_id=first, when=m.issued_at))
+        self.assertFalse(execute_mandate(m.pk, line_id=second, when=m.issued_at))
         p2 = decide(decide(self.propose("100").id, self.chair.id, approve=True).id, self.secretary.id, approve=True)
         self.assertEqual(expire_mandates(now=m.expires_at + (m.expires_at - m.issued_at)), 1)
         self.assertEqual(Mandate.objects.get(reference=p2.mandate_reference).status, MandateStatus.EXPIRED)

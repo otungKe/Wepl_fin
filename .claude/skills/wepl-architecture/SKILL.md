@@ -73,6 +73,12 @@ that changes the rule. Never loosen the test quietly.
   means adding a row there.
 - **The ledger holds plain ids.** It stays the foundation and depends on
   nobody.
+- **Linked rows share a tenant (ADR-0017).** Foreign key checks ignore RLS,
+  so every key between tenant-scoped tables also carries the tenant: give the
+  parent `tenant_keyed(...)` and the link `same_tenant(...)` from
+  `persistence/tenancy.py`. A plain-id link gets a check trigger, installed
+  by the context that already depends on the other one. The guard in
+  `tests/test_linked_rows.py` fails the build when a link misses this.
 
 ## Transactions and side effects
 
