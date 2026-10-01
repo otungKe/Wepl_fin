@@ -25,6 +25,25 @@
   future context can commit an unbalanced **or edited** ledger". Several
   probes break that promise.
 
+## Status
+
+Harry said "Yes to harden. Implement it" on 2026-10-01. Recommended changes
+1–7 are in:
+- migration `ledger 0005`;
+- `infrastructure/accounts.py`, and the reversal race message in
+  `application/posting.py`;
+- tests:
+  - `ledger/tests/integration/test_database_rules.py`, one per probe;
+  - `tests/test_ledger_committed.py`, a real commit for P1.
+
+Not done, as recommended: balance checkpoints (Important 8) and the
+fingerprint serialisation (an Improvement).
+
+**How the seal works:** each new entry's id is added to a
+transaction-local list, `wepl.ledger_open_entries`. A transaction that posts
+very many entries carries a long list. That is fine at pilot volume; revisit
+it with checkpoints.
+
 ## Executive assessment
 
 **The shape is right; the database enforcement is incomplete.**

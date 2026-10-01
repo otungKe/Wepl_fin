@@ -8,6 +8,7 @@ from persistence.tenancy import tenant_column
 from ..domain.accounts import AccountPurpose, Side
 
 SIDES = [(s.value, s.name.title()) for s in Side]
+DEBIT_NORMAL = [p.value for p in AccountPurpose if p.normal_side is Side.DEBIT]
 
 
 class Account(models.Model):
@@ -24,8 +25,17 @@ class Account(models.Model):
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(fields=["fund_id", "purpose", "member_id", "external_account_id", "currency"],
-                                    nulls_distinct=False, name="ledger_account_unique_key"),
+            # The key is unique within a tenant: a row in one tenant must never
+            # block another tenant's account (review of 2026-10-01, Critical 3).
+            models.UniqueConstraint(fields=["tenant", "fund_id", "purpose", "member_id", "external_account_id",
+                                            "currency"], nulls_distinct=False, name="ledger_account_unique_key"),
+            models.CheckConstraint(condition=Q(purpose__in=[p.value for p in AccountPurpose]),
+                                   name="ledger_account_purpose_known"),
+            # ADR-0003's table: balances are signed by this side, so it must follow the purpose.
+            models.CheckConstraint(condition=Q(purpose__in=DEBIT_NORMAL, normal_side="D")
+                                   | (~Q(purpose__in=DEBIT_NORMAL) & Q(normal_side="C")),
+                                   name="ledger_account_normal_side_follows_purpose"),
+            models.CheckConstraint(condition=Q(currency__regex=r"^[A-Z]{3}$"), name="ledger_account_currency_code"),
             models.CheckConstraint(condition=Q(purpose="member_interest", member_id__isnull=False)
                                    | (~Q(purpose="member_interest") & Q(member_id__isnull=True)),
                                    name="ledger_member_interest_has_member"),

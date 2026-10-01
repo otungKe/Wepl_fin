@@ -29,6 +29,8 @@ def post_journal(draft: JournalDraft) -> int:
     except IntegrityError:
         existing = JournalEntry.objects.filter(idempotency_key=draft.idempotency_key).first()
         if existing is None:
+            if draft.reverses_entry_id and JournalEntry.objects.filter(reverses_id=draft.reverses_entry_id).exists():
+                raise LedgerError(f"Entry {draft.reverses_entry_id} has already been reversed.") from None
             raise
         return _replay(existing, draft)  # lost a race on the same key
     return entry.pk
