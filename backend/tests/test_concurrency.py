@@ -33,6 +33,32 @@ class ConcurrentJoinTests(unittest.TestCase):
             codes = sorted(m.code for m in members(group.id))
         self.assertEqual(codes, [f"M{n:02d}" for n in range(1, JOINERS + 1)])
 
+    def test_without_the_application_lock_the_database_still_hands_out_each_code_once(self):
+        """The group row lock in add_member only keeps honest joins from
+        failing; the allocation trigger (communities 0007, 0009) is what makes a
+        duplicate or out-of-order code impossible. Here every writer reads the
+        counter without a lock, all read the same value, then all insert."""
+        from django.db import DatabaseError
+        from contexts.communities.infrastructure.models import Group, Membership
+        from contexts.identity.public import register_person
+        group = create_group("Unlocked inserts", actor="test")
+        with tenant(group.tenant_id):
+            people = [register_person(f"0796{n:06d}", f"U{n}").id for n in range(JOINERS)]
+        read = threading.Barrier(JOINERS)
+
+        def insert(n):
+            seq = Group.objects.get(pk=group.id).last_member_sequence  # no FOR UPDATE: a stale read
+            read.wait()
+            Membership.objects.create(group_id=group.id, person_id=people[n], member_code=f"M{seq + 1:02d}")
+
+        errors = run_together(insert, group.tenant_id)
+        self.assertEqual(len(errors), JOINERS - 1)
+        self.assertTrue(all(isinstance(e, DatabaseError) and "is not the next" in str(e) for e in errors), errors)
+        with tenant(group.tenant_id):
+            self.assertEqual([m.code for m in members(group.id)], ["M01"])
+            self.assertEqual(Group.objects.get(pk=group.id).last_member_sequence, 1)  # refused inserts rolled back
+            self.assertEqual(add_member(group.id, msisdn="0796999999", name="Next", actor="test").code, "M02")
+
     def test_the_same_person_joining_twice_at_once_gets_one_membership(self):
         group = create_group("Concurrent rejoin", actor="test")
         errors = run_together(lambda n: add_member(group.id, msisdn="0798000001", name="Same", actor="test"),
