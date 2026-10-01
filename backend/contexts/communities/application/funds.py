@@ -9,14 +9,15 @@ from ..domain.fund import FundError, check_currency, clean_fund_name
 from ..infrastructure.models import Fund
 from .queries import fund_view, group_view
 
-UNIQUE_NAME = "community_fund_name"
+UNIQUE_NAME = "community_fund_name_any_case"
 
 
 @transaction.atomic  # the fund and its audit event commit together, or neither does
-def open_fund(group_id: int, *, name: str = "Main fund", currency: str = "KES", actor: str) -> FundView:
+def open_fund(group_id: int, *, name: str, currency: str = "KES", actor: str) -> FundView:
     """Open one of the group's named pools of money ("Main savings",
     "Welfare"). A group may have none yet, or several (ADR-0013). Balances
-    are the ledger's; this only names the pool."""
+    are the ledger's; this only names the pool. The name is the group's own,
+    from its constitution (§3); there is no default."""
     require_tenant()  # without one every group is invisible; say so, not "unknown group"
     try:
         name, currency = clean_fund_name(name), check_currency(currency)

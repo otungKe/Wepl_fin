@@ -17,14 +17,13 @@ class FundNameTests(SimpleTestCase):
         with self.assertRaisesMessage(FundError, "at most"):
             clean_fund_name("x" * (FUND_NAME_MAX + 1))
 
-    def test_case_is_kept_as_given(self):  # whether case distinguishes names is undecided (review C1)
+    def test_case_is_kept_as_given(self):  # but uniqueness ignores it (the database's any-case index)
         self.assertEqual(clean_fund_name("savings"), "savings")
 
 
 class CurrencyTests(SimpleTestCase):
     def test_a_currency_is_three_capital_letters(self):
         self.assertEqual(check_currency("KES"), "KES")
-        self.assertEqual(check_currency("USD"), "USD")  # which codes are allowed is review D3
-        for bad in ("kes", "X1", "", "USDX", " KES", None, 404):
+        for bad in ("kes", "X1", "", "USDX", " KES", None, 404, "USD"):  # USD: KES only for the pilot
             with self.subTest(bad), self.assertRaises(FundError):
                 check_currency(bad)

@@ -1,9 +1,11 @@
 from django.db import models
 from django.db.models import Q
+from django.db.models.functions import Lower
 
 from contexts.tenancy.contract import TenantScope
 from persistence.tenancy import tenant_column
 
+from ..domain.fund import CURRENCIES
 from ..domain.membership import TITLE_MAX, MembershipStatus
 
 
@@ -31,7 +33,11 @@ class Fund(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        constraints = [models.UniqueConstraint(fields=["group", "name"], name="community_fund_name")]
+        constraints = [
+            # "Savings" and "savings" are one fund to members (Harry, 2026-10-01)
+            models.UniqueConstraint("group", Lower("name"), name="community_fund_name_any_case"),
+            models.CheckConstraint(condition=Q(currency__in=CURRENCIES), name="community_fund_currency"),
+        ]
 
 
 class Membership(models.Model):

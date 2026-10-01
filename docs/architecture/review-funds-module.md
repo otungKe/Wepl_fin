@@ -21,8 +21,12 @@
 - **Status:** Harry said "Implement" on 2026-10-01. B1–B6 and tests 1–9 of
   section N are in: migration `communities 0010`, `domain/fund.py`,
   `funds.py`, `fund_view`, and tests in `communities/tests/{unit/test_fund,
-  integration/test_funds}.py` and `tests/test_concurrency.py`. Still open:
-  C1 (case of names), C5 (the default name), and D1–D3.
+  integration/test_funds}.py` and `tests/test_concurrency.py`.
+- **Decided by Harry, 2026-10-01 ("Implement those"),** in `communities 0011`:
+  - C1: names are unique per group regardless of case;
+  - C5: no default name;
+  - D3: KES only for the pilot, in the domain and as a database check.
+  Still open: D1 (tenant consistency) and D2 (lifecycle).
 - **Not present:** there is no `contributions` or `payments` context yet
   (CONFIRMED, `backend/contexts/`; `overview.md`, "Not yet built").
 

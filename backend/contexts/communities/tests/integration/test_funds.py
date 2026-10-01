@@ -23,21 +23,28 @@ class OpeningTests(TestCase):
         self.enterContext(tenant(self.a.tenant_id))
 
     def test_a_fund_is_opened_and_audited(self):
-        f = open_fund(self.a.id, name="  Main   savings ", currency="USD", actor="0712000001")
-        self.assertEqual((f.group_id, f.name, f.currency), (self.a.id, "Main savings", "USD"))
+        f = open_fund(self.a.id, name="  Main   savings ", currency="KES", actor="0712000001")
+        self.assertEqual((f.group_id, f.name, f.currency), (self.a.id, "Main savings", "KES"))
         [event] = history(target_type="fund", target_id=f.id)
         self.assertEqual((event["actor"], event["action"], event["data"]),
-                         ("0712000001", "fund.opened", {"name": "Main savings", "currency": "USD"}))
+                         ("0712000001", "fund.opened", {"name": "Main savings", "currency": "KES"}))
 
-    def test_the_default_name_and_currency(self):
-        f = open_fund(self.a.id, actor="t")
-        self.assertEqual((f.name, f.currency), ("Main fund", "KES"))
+    def test_the_group_names_its_fund_and_it_is_held_in_kes(self):
+        with self.assertRaises(TypeError):  # no default name: the constitution names each fund (§3)
+            open_fund(self.a.id, actor="t")
+        self.assertEqual(open_fund(self.a.id, name="Welfare", actor="t").currency, "KES")
+
+    def test_only_kes_for_the_pilot(self):
+        with self.assertRaisesMessage(CommunityError, "KES only"):
+            open_fund(self.a.id, name="Dollars", currency="USD", actor="t")
+        with self.assertRaisesMessage(DatabaseError, "community_fund_currency"), transaction.atomic():
+            Fund.objects.create(group_id=self.a.id, name="Dollars", currency="USD")
 
     def test_invalid_names_and_currencies_are_community_errors(self):
         for kw in ({"name": None}, {"name": "  "}, {"name": "x" * 81}, {"currency": "kes"}, {"currency": ""},
                    {"currency": "USDX"}):
             with self.subTest(kw), self.assertRaises(CommunityError):
-                open_fund(self.a.id, actor="t", **kw)
+                open_fund(self.a.id, actor="t", **{"name": "Valid", **kw})
         self.assertFalse(Fund.objects.exists())
 
     def test_names_are_unique_per_group_only(self):
@@ -45,7 +52,11 @@ class OpeningTests(TestCase):
         open_fund(self.a.id, name="Welfare", actor="t")
         with self.assertRaisesMessage(CommunityError, "A already has a fund called 'Savings'"):
             open_fund(self.a.id, name=" Savings", actor="t")
-        self.assertEqual(open_fund(self.a.id, name="savings", actor="t").name, "savings")  # review C1: undecided
+        for variant in ("savings", "SAVINGS"):  # one fund to members, whatever the case (Harry, 2026-10-01)
+            with self.subTest(variant), self.assertRaisesMessage(CommunityError, "already has a fund"):
+                open_fund(self.a.id, name=variant, actor="t")
+        with self.assertRaisesMessage(DatabaseError, "community_fund_name_any_case"), transaction.atomic():
+            Fund.objects.create(group_id=self.a.id, name="WELFARE")
 
     def test_a_failed_audit_leaves_no_fund(self):
         with mock.patch("contexts.communities.application.funds.record", side_effect=RuntimeError("audit down")):
@@ -91,10 +102,10 @@ class FundTenantTests(TestCase):
 
     def test_no_tenant_context_is_a_tenancy_error(self):
         with self.assertRaisesMessage(TenancyError, "needs a tenant context"):
-            open_fund(self.a.id, actor="t")
+            open_fund(self.a.id, name="Savings", actor="t")
         with cross_tenant("test: every group visible, no tenant", actor="t"):
             with self.assertRaisesMessage(TenancyError, "needs a tenant context"):
-                open_fund(self.a.id, actor="t")  # was misreported as "already has a fund"
+                open_fund(self.a.id, name="Savings", actor="t")  # was misreported as "already has a fund"
 
     def test_the_database_refuses_a_fund_for_a_foreign_group(self):
         with tenant(self.a.tenant_id), self.assertRaisesMessage(DatabaseError, "unknown group"), \

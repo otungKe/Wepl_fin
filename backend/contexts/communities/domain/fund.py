@@ -6,6 +6,10 @@ import re
 
 FUND_NAME_MAX = 80
 _CURRENCY = re.compile(r"[A-Z]{3}")
+# Harry, 2026-10-01: the pilot holds Kenyan shillings only. Money, the ledger's
+# queries and custody's statements all assume KES today; allowing another
+# currency is an ADR, then a migration (communities 0011 checks it too).
+CURRENCIES = ("KES",)
 
 
 class FundError(ValueError):
@@ -13,7 +17,9 @@ class FundError(ValueError):
 
 
 def clean_fund_name(name: str | None) -> str:
-    """Trimmed, inner whitespace collapsed; never blank, at most 80 characters."""
+    """Trimmed, inner whitespace collapsed; never blank, at most 80 characters.
+    Case is kept as given, but names are unique per group regardless of case
+    (Harry, 2026-10-01): "Savings" and "savings" are the same fund to members."""
     name = " ".join((name or "").split())
     if not name:
         raise FundError("A fund needs a name.")
@@ -23,8 +29,9 @@ def clean_fund_name(name: str | None) -> str:
 
 
 def check_currency(currency: str | None) -> str:
-    """A well-formed ISO 4217 code, e.g. "KES". Which codes a group may use is
-    not decided here (review D3)."""
+    """One of the currencies a fund may be opened in: only KES for the pilot."""
     if not isinstance(currency, str) or not _CURRENCY.fullmatch(currency):
         raise FundError(f"{currency!r} is not a currency code (three capital letters, e.g. KES).")
+    if currency not in CURRENCIES:
+        raise FundError(f"Funds are held in {', '.join(CURRENCIES)} only; {currency} is not supported.")
     return currency

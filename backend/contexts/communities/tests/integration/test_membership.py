@@ -55,7 +55,7 @@ class MembershipTests(TestCase):
         with self.assertRaisesMessage(CommunityError, "Unknown group"):
             add_member(999999, msisdn="0712000001", name="P", actor="t")
         with self.assertRaisesMessage(CommunityError, "Unknown group"):
-            open_fund(999999, actor="t")
+            open_fund(999999, name="Savings", actor="t")
 
     def test_leaving_keeps_the_code_and_a_returning_member_gets_a_new_one(self):
         first = self.add(1)

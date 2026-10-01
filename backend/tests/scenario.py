@@ -36,7 +36,7 @@ class Scenario:
         self.group = create_group(name, actor="test")
         self.tenant_id = self.group.tenant_id
         with self.acting():
-            self.fund = open_fund(self.group.id, actor="test")
+            self.fund = open_fund(self.group.id, name="Main savings", actor="test")
             adopt_constitution(self.group.id, rules or RULES, actor="test")
             self.m = []
             for n, nm, title, capabilities in people:
@@ -101,7 +101,7 @@ def act_for_new_group(testcase, name="G"):
     """Found a group with one fund, and act for it until the test ends."""
     group = create_group(name, actor="test")
     testcase.enterContext(tenant(group.tenant_id))
-    return group, open_fund(group.id, actor="test")
+    return group, open_fund(group.id, name="Main savings", actor="test")
 
 
 def act_for_new_tenant(testcase, name="Test tenant") -> int:
