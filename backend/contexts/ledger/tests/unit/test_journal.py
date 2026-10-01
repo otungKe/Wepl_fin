@@ -61,6 +61,19 @@ class JournalDraftTests(SimpleTestCase):
         self.assertEqual({(p.account, p.side) for p in r.postings}, {(CASH, C), (MEMBER, D)})
         self.assertEqual(r.reverses_entry_id, 7)
 
+    def test_a_reversal_names_the_entry_it_reverses_as_its_cause(self):
+        """The cause is fingerprinted, so this puts the reversed entry in the
+        reversal's idempotency identity."""
+        d = draft(Posting(CASH, D, Money("10")), Posting(MEMBER, C, Money("10")))
+        r = d.reversal(entry_id=7, idempotency_key="r")
+        self.assertEqual((r.cause_type, r.cause_id), ("journal_entry", "7"))
+        self.assertNotEqual(r.fingerprint(), d.reversal(entry_id=8, idempotency_key="r").fingerprint())
+        from dataclasses import replace
+        with self.assertRaisesMessage(LedgerError, "cause must be the entry it reverses"):
+            replace(r, cause_id="8")
+        with self.assertRaisesMessage(LedgerError, "cause must be the entry it reverses"):
+            replace(r, cause_type="t")
+
     def test_fingerprint_ignores_order_but_not_content(self):
         a = draft(Posting(CASH, D, Money("10")), Posting(MEMBER, C, Money("10")))
         b = draft(Posting(MEMBER, C, Money("10")), Posting(CASH, D, Money("10")))

@@ -47,6 +47,11 @@ class JournalDraft:
         object.__setattr__(self, "cause_id", str(self.cause_id))
         if not self.idempotency_key:
             raise LedgerError("Every entry needs an idempotency key.")
+        if self.reverses_entry_id is not None and (self.cause_type, self.cause_id) != (
+                "journal_entry", str(self.reverses_entry_id)):
+            # The cause is in the fingerprint, so this makes the reversed
+            # entry part of the entry's identity for idempotency.
+            raise LedgerError("A reversal's cause must be the entry it reverses.")
         if len(self.postings) < 2:
             raise LedgerError("An entry needs at least two postings.")
         totals: dict[str, Money] = {}
@@ -73,7 +78,12 @@ class JournalDraft:
 
     def fingerprint(self) -> str:
         """What the entry says, independent of order: detects an idempotency
-        key being reused for a different entry."""
+        key being reused for a different entry.
+
+        Covered: kind, cause, and every posting (account, so group and fund,
+        side, amount, currency); for a reversal the cause is the reversed
+        entry. Not covered: the memo, which is description, not substance.
+        Changing this changes stored fingerprints, so it needs a migration."""
         parts = sorted(f"{p.account}|{p.side}|{p.amount.amount}|{p.amount.currency}" for p in self.postings)
         return "\n".join([self.kind, self.cause_type, self.cause_id, *parts])
 
