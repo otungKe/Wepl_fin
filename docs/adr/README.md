@@ -4,7 +4,7 @@
 |---|---|---|
 | [0001](0001-modular-monolith-on-django-and-postgres.md) | Modular monolith on Django 5.2 LTS and PostgreSQL; no Redis or Celery | Django 5.2 LTS accepted; rest proposed |
 | [0002](0002-bounded-contexts.md) | The contexts, their layers and their public surfaces | Proposed |
-| [0003](0003-ledger-model.md) | Double-entry, append-only ledger enforced in the domain and in PostgreSQL | Proposed |
+| [0003](0003-ledger-model.md) | Double-entry, append-only ledger enforced in the domain and in PostgreSQL; a reversal is reversible, each entry at most once | Proposed; reversal rule decided by Harry |
 | [0004](0004-cross-context-references.md) | How contexts refer to each other's records | Proposed |
 | [0005](0005-group-as-isolation-boundary.md) | The group is the data-isolation boundary until tenancy is decided | Superseded in part by 0009 |
 | [0006](0006-custody-detective-control.md) | Pilot custody: groups hold money at I&M; WEPL reconciles and alerts | Proposed |
@@ -17,6 +17,8 @@
 | [0013](0013-founding-a-group.md) | A group founds its own tenant in one transaction; funds are opened separately; Segment removed; PostgreSQL allocates member codes on every insert | Proposed (follows Harry's application-layer review) |
 | [0014](0014-leaver-balances.md) | Does a leaver's unpaid balance share interest and charges until settled? Today it is frozen by accident; pinned by a test | Direction decided (each group chooses); details open |
 | [0015](0015-fund-lifecycle.md) | A fund is opened, renamed while open, closed only when empty in the ledger, governance and custody, never reopened or deleted | Accepted |
+| [0016](0016-derived-balances-at-scale.md) | Balances stay derived from full history; measured, with indexes RLS can use; checkpoints only past 100,000 lines in a fund | Proposed (follows Harry's measurement request) |
+| [0017](0017-linked-rows-keep-their-tenant.md) | A row and every row it refers to share a tenant: composite foreign keys, plus checks for plain ids installed by the dependent context | Proposed; not yet implemented |
 
 All are **Proposed** until Harry accepts them. Harry's
 [foundational decisions](../architecture/foundational-decisions.md)

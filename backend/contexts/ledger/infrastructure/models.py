@@ -43,6 +43,11 @@ class Account(models.Model):
                                    | (~Q(purpose="custody_cash") & Q(external_account_id__isnull=True)),
                                    name="ledger_custody_cash_has_external_account"),
         ]
+        # Row-level security adds "tenant = current OR cross-tenant" to every
+        # query, and PostgreSQL cannot use that OR to enter an index that
+        # leads with tenant. Without an index that leads with fund, every read
+        # scanned every tenant's accounts (measured: ADR-0016).
+        indexes = [models.Index(fields=["fund_id"], name="ledger_account_fund")]
 
 
 class JournalEntry(models.Model):
@@ -62,7 +67,9 @@ class JournalEntry(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        indexes = [models.Index(fields=["fund_id", "id"]), models.Index(fields=["cause_type", "cause_id"])]
+        indexes = [models.Index(fields=["fund_id", "id"]), models.Index(fields=["cause_type", "cause_id"]),
+                   # The idempotency lookup, for the reason given on Account.
+                   models.Index(fields=["idempotency_key"], name="ledger_entry_key")]
         constraints = [models.UniqueConstraint(fields=["tenant", "idempotency_key"], name="ledger_entry_key_unique")]
 
 
@@ -80,3 +87,30 @@ class JournalLine(models.Model):
             models.CheckConstraint(condition=Q(side__in=["D", "C"]), name="ledger_line_side_valid"),
         ]
         indexes = [models.Index(fields=["account", "entry"])]
+
+
+class IntegrityCheck(models.Model):
+    """One nightly look at one fund's books (ledger 0006). Monitoring only: it
+    records what the journal said at the time and is never read as a balance."""
+
+    tenant_scope = TenantScope.TENANT_SCOPED
+    tenant = tenant_column()
+    fund_id = models.BigIntegerField()
+    currency = models.CharField(max_length=3)
+    trial_balance = models.DecimalField(max_digits=18, decimal_places=2)
+    cash = models.DecimalField(max_digits=18, decimal_places=2)
+    member_interests = models.DecimalField(max_digits=18, decimal_places=2)
+    unattributed = models.DecimalField(max_digits=18, decimal_places=2)
+    retained = models.DecimalField(max_digits=18, decimal_places=2)
+    unexplained_out = models.DecimalField(max_digits=18, decimal_places=2)
+    invariant_holds = models.BooleanField()
+    passed = models.BooleanField()
+    lines = models.PositiveBigIntegerField()  # the fund's history: what ADR-0016's threshold watches
+    checked_at = models.DateTimeField(auto_now_add=True)
+    operation_id = models.CharField(max_length=64, blank=True, default="")
+
+    class Meta:
+        indexes = [models.Index(fields=["fund_id", "id"])]
+        constraints = [models.CheckConstraint(  # "passed" can only mean both checks held
+            condition=Q(passed=True, trial_balance=0, invariant_holds=True)
+            | (Q(passed=False) & ~Q(trial_balance=0, invariant_holds=True)), name="ledger_check_passed_means_both")]

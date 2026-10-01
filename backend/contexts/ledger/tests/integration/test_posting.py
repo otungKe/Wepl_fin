@@ -66,6 +66,23 @@ class PostingTests(TestCase):
         self.assertEqual(account_balance(CASH), Money("0"))
         self.assertEqual(JournalEntry.objects.count(), 2)
 
+    def test_a_reversal_is_itself_reversible_once(self):
+        """Harry's rule (2026-10-01, ADR-0003): a reversal is an immutable entry
+        like any other, so a wrong reversal is corrected by reversing it, never
+        by an edit or a special case. Each entry is reversed at most once."""
+        original = post_journal(draft("o"))
+        reversal = reverse_journal(original, idempotency_key="o:rev")
+        self.assertEqual(account_balance(CASH), Money("0"))
+        restored = reverse_journal(reversal, idempotency_key="o:rev:rev")
+        self.assertEqual(account_balance(CASH), Money("100"))
+        self.assertEqual(JournalEntry.objects.get(pk=restored).reverses_id, reversal)
+        with self.assertRaisesMessage(LedgerError, "already been reversed"):
+            reverse_journal(reversal, idempotency_key="o:rev:rev-again")
+        reverse_journal(restored, idempotency_key="o:rev:rev:rev")
+        self.assertEqual(account_balance(CASH), Money("0"))
+        self.assertEqual(JournalEntry.objects.count(), 4)
+        self.assertEqual(trial_balance(1), 0)
+
     def test_a_reversal_retry_returns_the_same_entry(self):
         entry = post_journal(draft("r"))
         first = reverse_journal(entry, idempotency_key="r:rev", memo="first")

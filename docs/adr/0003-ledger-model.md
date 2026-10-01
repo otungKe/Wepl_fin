@@ -34,6 +34,20 @@ Integrity is enforced at several layers (rule 47):
 Corrections are reversals or new entries, never edits (rule 19). Balances are
 always derived from the journal, never stored (rules 18, 27).
 
+**Reversals (Harry, 2026-10-01).**
+- A reversal is an ordinary, immutable journal entry that mirrors another.
+- Every entry, a reversal included, can be reversed **at most once**. So a
+  reversal that was itself posted wrongly is corrected by reversing it:
+  `original → reversal → reversal of the reversal`. Each step is a new
+  entry, with no edit and no special case.
+- There is deliberately **no rule against reversing a reversal**.
+- Enforcement:
+  - "at most once" is a unique constraint on `reverses`;
+  - "mirrors exactly" and "same tenant" are triggers (ledger 0005);
+  - a reversal's cause is the entry it reverses, which puts that entry in
+    its idempotency identity.
+- Pinned by `test_a_reversal_is_itself_reversible_once`.
+
 ## Consequences
 
 - No code path, shell session or future context can commit an unbalanced or
