@@ -16,6 +16,7 @@
 | [0012](0012-membership-is-small.md) | Membership owns only group, status, code and title; Segment describes the group; LEFT is final; member codes are never reused, enforced in PostgreSQL | Proposed (answers Harry's membership review) |
 | [0013](0013-founding-a-group.md) | A group founds its own tenant in one transaction; funds are opened separately; Segment removed; PostgreSQL allocates member codes on every insert | Proposed (follows Harry's application-layer review) |
 | [0014](0014-leaver-balances.md) | Does a leaver's unpaid balance share interest and charges until settled? Today it is frozen by accident; pinned by a test | Direction decided (each group chooses); details open |
+| [0015](0015-fund-lifecycle.md) | A fund is opened, renamed while open, closed only when empty in the ledger, governance and custody, never reopened or deleted | Accepted |
 
 All are **Proposed** until Harry accepts them. Harry's
 [foundational decisions](../architecture/foundational-decisions.md)

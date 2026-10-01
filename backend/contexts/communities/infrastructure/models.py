@@ -5,7 +5,7 @@ from django.db.models.functions import Lower
 from contexts.tenancy.contract import TenantScope
 from persistence.tenancy import tenant_column
 
-from ..domain.fund import CURRENCIES
+from ..domain.fund import CURRENCIES, FundStatus
 from ..domain.membership import TITLE_MAX, MembershipStatus
 
 
@@ -30,12 +30,16 @@ class Fund(models.Model):
     group = models.ForeignKey(Group, on_delete=models.PROTECT, related_name="funds")
     name = models.CharField(max_length=80)
     currency = models.CharField(max_length=3, default="KES")
+    status = models.CharField(max_length=10, choices=[(s.value, s.value) for s in FundStatus],
+                              default=FundStatus.OPEN.value, db_default=FundStatus.OPEN.value)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         constraints = [
-            # "Savings" and "savings" are one fund to members (Harry, 2026-10-01)
-            models.UniqueConstraint("group", Lower("name"), name="community_fund_name_any_case"),
+            # "Savings" and "savings" are one fund to members; a closed fund's
+            # name is free again (Harry, 2026-10-01)
+            models.UniqueConstraint("group", Lower("name"), condition=Q(status="open"),
+                                    name="community_open_fund_name_any_case"),
             models.CheckConstraint(condition=Q(currency__in=CURRENCIES), name="community_fund_currency"),
         ]
 

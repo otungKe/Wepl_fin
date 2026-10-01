@@ -3,6 +3,7 @@
 the ledger's, where the money is held is custody's, and who may spend it is
 governance's (ADR-0013; docs/architecture/review-funds-module.md)."""
 import re
+from enum import StrEnum
 
 FUND_NAME_MAX = 80
 _CURRENCY = re.compile(r"[A-Z]{3}")
@@ -12,8 +13,22 @@ _CURRENCY = re.compile(r"[A-Z]{3}")
 CURRENCIES = ("KES",)
 
 
+class FundStatus(StrEnum):
+    """OPEN, then CLOSED, and never back (Harry, 2026-10-01). A group that
+    needs the pool again opens a new fund, so old records keep meaning the old
+    one. A fund is never deleted."""
+
+    OPEN = "open"
+    CLOSED = "closed"
+
+
 class FundError(ValueError):
     pass
+
+
+def ensure_open(status: str) -> None:
+    if FundStatus(status) is not FundStatus.OPEN:
+        raise FundError("This fund is closed; open a new fund instead.")
 
 
 def clean_fund_name(name: str | None) -> str:

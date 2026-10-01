@@ -19,7 +19,7 @@ def fund_view(fund_id: int) -> FundView:
     f = Fund.objects.filter(pk=fund_id).first()
     if f is None:
         raise CommunityError(f"Unknown fund {fund_id}.")
-    return FundView(id=f.pk, group_id=f.group_id, name=f.name, currency=f.currency)
+    return FundView(id=f.pk, group_id=f.group_id, name=f.name, currency=f.currency, status=f.status)
 
 
 def _views(rows) -> list[MembershipView]:

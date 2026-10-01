@@ -7,7 +7,13 @@ from django.test import TestCase
 
 from contexts.audit.public import history
 from contexts.communities.infrastructure.models import Fund
-from contexts.communities.public import CommunityError, create_group, fund_view, open_fund
+from contexts.communities.public import (CommunityError, add_member, close_fund, create_group, fund_view, open_fund,
+                                         rename_fund)
+from contexts.custody.public import CustodyError, link_external_account
+from contexts.governance.public import Capability, GovernanceError, grant, adopt_constitution, cancel_proposal, propose_withdrawal
+from contexts.ledger.public import (AccountKey, AccountPurpose, JournalDraft, Side, fund_holds_nothing, post_journal,
+                                    reverse_journal)
+from contexts.shared_kernel.money import Money
 from contexts.custody.infrastructure.models import ExternalAccount
 from contexts.ledger.infrastructure.models import Account, JournalEntry
 from contexts.notifications.infrastructure.models import OutboxEvent
@@ -55,7 +61,7 @@ class OpeningTests(TestCase):
         for variant in ("savings", "SAVINGS"):  # one fund to members, whatever the case (Harry, 2026-10-01)
             with self.subTest(variant), self.assertRaisesMessage(CommunityError, "already has a fund"):
                 open_fund(self.a.id, name=variant, actor="t")
-        with self.assertRaisesMessage(DatabaseError, "community_fund_name_any_case"), transaction.atomic():
+        with self.assertRaisesMessage(DatabaseError, "community_open_fund_name_any_case"), transaction.atomic():
             Fund.objects.create(group_id=self.a.id, name="WELFARE")
 
     def test_a_failed_audit_leaves_no_fund(self):
@@ -127,3 +133,99 @@ class FundTenantTests(TestCase):
             Fund.objects.filter(pk=self.b_fund.id).update(name="Main savings")  # renaming is review D2: not ruled
             self.assertEqual((fund_view(self.b_fund.id).currency, fund_view(self.b_fund.id).group_id),
                              ("KES", self.b.id))
+
+
+class LifecycleTests(TestCase):
+    """Open, rename while open, close when empty; never reopened or deleted (ADR-0015)."""
+
+    def setUp(self):
+        self.group = create_group("G", actor="t")
+        self.enterContext(tenant(self.group.tenant_id))
+        self.fund = open_fund(self.group.id, name="Welfare", actor="t")
+
+    def test_an_open_fund_is_renamed_and_the_old_name_kept_in_the_audit(self):
+        open_fund(self.group.id, name="Savings", actor="t")
+        f = rename_fund(self.fund.id, "  Welfare   kitty ", actor="0712000001")
+        self.assertEqual(f.name, "Welfare kitty")
+        self.assertEqual(rename_fund(self.fund.id, "WELFARE KITTY", actor="t").name, "WELFARE KITTY")  # its own name
+        with self.assertRaisesMessage(CommunityError, "already has a fund called 'savings'"):
+            rename_fund(self.fund.id, "savings", actor="t")
+        renames = [e["data"] for e in history(target_type="fund", target_id=self.fund.id)
+                   if e["action"] == "fund.renamed"]
+        self.assertEqual(renames, [{"from": "Welfare", "to": "Welfare kitty"},
+                                   {"from": "Welfare kitty", "to": "WELFARE KITTY"}])
+
+    def test_an_empty_fund_closes_for_good(self):
+        f = close_fund(self.fund.id, actor="t")
+        self.assertEqual((f.status, f.is_open), ("closed", False))
+        self.assertIn("fund.closed", [e["action"] for e in history(target_type="fund", target_id=f.id)])
+        for use_case in (lambda: close_fund(f.id, actor="t"), lambda: rename_fund(f.id, "Other", actor="t")):
+            with self.subTest(use_case), self.assertRaisesMessage(CommunityError, "closed"):
+                use_case()
+        for change in ({"status": "open"}, {"name": "Other"}):
+            with self.subTest(change), self.assertRaisesMessage(DatabaseError, "never reopens"), \
+                    transaction.atomic():
+                Fund.objects.filter(pk=f.id).update(**change)
+
+    def test_a_closed_funds_name_is_free_again(self):
+        close_fund(self.fund.id, actor="t")
+        again = open_fund(self.group.id, name="welfare", actor="t")
+        self.assertNotEqual(again.id, self.fund.id)
+        self.assertEqual(fund_view(self.fund.id).name, "Welfare")  # the old fund still means the old pool
+
+    def test_funds_are_never_deleted(self):
+        for fund in (self.fund, close_fund(open_fund(self.group.id, name="Old", actor="t").id, actor="t")):
+            with self.subTest(fund.status), self.assertRaisesMessage(DatabaseError, "never deleted"), \
+                    transaction.atomic():
+                Fund.objects.filter(pk=fund.id).delete()
+
+    def test_a_fund_holding_money_does_not_close_until_it_is_empty(self):
+        key = lambda purpose, **kw: AccountKey(group_id=self.group.id, fund_id=self.fund.id, purpose=purpose, **kw)
+        entry = post_journal(JournalDraft.build(
+            idempotency_key="t-1", group_id=self.group.id, fund_id=self.fund.id, kind="test", cause_type="test",
+            cause_id="1", postings=[(key(AccountPurpose.UNEXPLAINED_OUT), Side.DEBIT, Money("100")),
+                                    (key(AccountPurpose.RETAINED), Side.CREDIT, Money("100"))]))
+        self.assertFalse(fund_holds_nothing(self.fund.id))
+        with self.assertRaisesMessage(CommunityError, "still holds money"):
+            close_fund(self.fund.id, actor="t")
+        reverse_journal(entry, idempotency_key="t-1-reversal")
+        self.assertTrue(fund_holds_nothing(self.fund.id))
+        self.assertEqual(close_fund(self.fund.id, actor="t").status, "closed")
+
+
+class OtherContextsAndAClosedFundTests(TestCase):
+    """Governance and custody each refuse what is theirs (ADR-0015)."""
+
+    def test_a_fund_with_an_open_proposal_does_not_close_and_a_closed_fund_takes_none(self):
+        from tests.scenario import RULES
+        group = create_group("G", actor="t")
+        self.enterContext(tenant(group.tenant_id))
+        fund, spare = (open_fund(group.id, name=n, actor="t") for n in ("Welfare", "Spare"))
+        adopt_constitution(group.id, RULES, actor="t")
+        m, *approvers = (add_member(group.id, msisdn=f"071200000{n}", name=f"P{n}", actor="t") for n in (1, 2, 3))
+        for a in approvers:
+            grant(a.id, Capability.APPROVE_PAYOUT, actor="t")
+        propose = lambda f: propose_withdrawal(m.id, f.id, amount="10", purpose="x", payee_name="x",
+                                               payee_account="0799000000")
+        p = propose(fund)
+        with self.assertRaisesMessage(CommunityError, "open proposal or an unexecuted mandate"):
+            close_fund(fund.id, actor="t")
+        cancel_proposal(p.id, m.id)
+        self.assertEqual(close_fund(fund.id, actor="t").status, "closed")
+        close_fund(spare.id, actor="t")
+        with self.assertRaisesMessage(GovernanceError, "is closed"):
+            propose(spare)
+
+    def test_a_fund_with_a_custodian_account_does_not_close_and_a_closed_fund_takes_none(self):
+        from tests.scenario import Scenario
+        s = Scenario()
+        self.enterContext(s.acting())
+        with self.assertRaisesMessage(CommunityError, "linked custodian account"):
+            close_fund(s.fund.id, actor="t")
+        closed = close_fund(open_fund(s.group.id, name="Closed", actor="t").id, actor="t")
+        with self.assertRaisesMessage(CustodyError, "is closed"):
+            link_external_account(closed.id, institution="I&M Bank Kenya", account_number="0099", account_name="x",
+                                  connector="im_simulator", actor="t")
+        with self.assertRaisesMessage(DatabaseError, "is closed"), transaction.atomic():
+            ExternalAccount.objects.create(group_id=s.group.id, fund_id=closed.id, institution="I&M Bank Kenya",
+                                           account_number="0099", account_name="x", connector="im_simulator")

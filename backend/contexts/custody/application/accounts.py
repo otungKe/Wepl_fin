@@ -1,4 +1,4 @@
-from django.db import transaction
+from django.db import IntegrityError, transaction
 
 from contexts.audit.public import record
 from contexts.communities.public import fund_view
@@ -30,11 +30,18 @@ def link_external_account(fund_id: int, *, institution: str, account_number: str
                           connector: str, actor: str) -> ExternalAccountView:
     """Record where a fund's money is held. One custodian account backs one fund."""
     fund = fund_view(fund_id)
+    if not fund.is_open:
+        raise CustodyError(f"{fund.name} is closed.")
     if ExternalAccount.objects.filter(institution=institution, account_number=account_number).exists():
         raise CustodyError(f"{institution} {account_number} is already linked.")
-    ea = ExternalAccount.objects.create(group_id=fund.group_id, fund_id=fund.id, institution=institution,
-                                        account_number=account_number, account_name=account_name,
-                                        connector=connector, currency=fund.currency)
+    try:
+        ea = ExternalAccount.objects.create(group_id=fund.group_id, fund_id=fund.id, institution=institution,
+                                            account_number=account_number, account_name=account_name,
+                                            connector=connector, currency=fund.currency)
+    except IntegrityError as exc:  # the fund closed after it was read (custody 0004, ADR-0015)
+        if getattr(getattr(exc.__cause__, "diag", None), "sqlstate", None) == "23001":
+            raise CustodyError(f"{fund.name} is closed.") from None
+        raise
     record(actor, "custody.account_linked", target_type="external_account", target_id=ea.pk, group_id=fund.group_id,
            data={"institution": institution, "account_number": account_number, "connector": connector})
     return _view(ea)

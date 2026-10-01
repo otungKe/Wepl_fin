@@ -1,7 +1,7 @@
 """Use cases: propose a withdrawal, decide on it, cancel it."""
 from datetime import timedelta
 
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from contexts.audit.public import record
@@ -62,6 +62,8 @@ def propose_withdrawal(proposer_id: int, fund_id: int, *, amount, purpose: str, 
         raise GovernanceError("Only active members can propose withdrawals.")
     if fund.group_id != proposer.group_id:
         raise GovernanceError("That fund belongs to another group.")
+    if not fund.is_open:
+        raise GovernanceError(f"{fund.name} is closed.")
     if not amount.is_positive:
         raise GovernanceError("Amount must be positive.")
     if charged_member_id is not None and membership(charged_member_id).group_id != proposer.group_id:
@@ -70,12 +72,17 @@ def propose_withdrawal(proposer_id: int, fund_id: int, *, amount, purpose: str, 
     if constitution is None:
         raise GovernanceError("The group has no constitution yet.")
     tier = ConstitutionRules.parse(constitution.rules).tier_for(amount)
-    p = Proposal.objects.create(
-        group_id=proposer.group_id, fund_id=fund.id, constitution=constitution, request_key=request_key,
-        proposed_by_id=proposer.id, amount=amount.amount, currency=amount.currency, purpose=purpose,
-        payee_name=payee_name, payee_account=payee_account, charged_member_id=charged_member_id,
-        allocation=Allocation.MEMBER if charged_member_id else Allocation.PRO_RATA,
-        approvers=tier.approvers.value, required_approvals=tier.required)
+    try:
+        p = Proposal.objects.create(
+            group_id=proposer.group_id, fund_id=fund.id, constitution=constitution, request_key=request_key,
+            proposed_by_id=proposer.id, amount=amount.amount, currency=amount.currency, purpose=purpose,
+            payee_name=payee_name, payee_account=payee_account, charged_member_id=charged_member_id,
+            allocation=Allocation.MEMBER if charged_member_id else Allocation.PRO_RATA,
+            approvers=tier.approvers.value, required_approvals=tier.required)
+    except IntegrityError as exc:  # the fund closed after it was read (governance 0005, ADR-0015)
+        if getattr(getattr(exc.__cause__, "diag", None), "sqlstate", None) == "23001":
+            raise GovernanceError(f"{fund.name} is closed.") from None
+        raise
     approvers = eligible_approvers(p.pk)
     if len(approvers) < tier.required:
         raise GovernanceError("Not enough eligible approvers for this amount under the constitution.")

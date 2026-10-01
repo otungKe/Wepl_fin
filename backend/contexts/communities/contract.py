@@ -1,8 +1,9 @@
 from dataclasses import dataclass
 
+from .domain.fund import FundStatus
 from .domain.membership import MembershipStatus
 
-__all__ = ["CommunityError", "FundView", "GroupView", "MembershipView", "MembershipStatus"]
+__all__ = ["CommunityError", "FundStatus", "FundView", "GroupView", "MembershipView", "MembershipStatus"]
 
 
 class CommunityError(ValueError):
@@ -22,6 +23,11 @@ class FundView:
     group_id: int
     name: str
     currency: str
+    status: str
+
+    @property
+    def is_open(self) -> bool:
+        return self.status == FundStatus.OPEN
 
 
 @dataclass(frozen=True)

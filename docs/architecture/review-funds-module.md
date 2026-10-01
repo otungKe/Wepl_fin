@@ -26,7 +26,8 @@
   - C1: names are unique per group regardless of case;
   - C5: no default name;
   - D3: KES only for the pilot, in the domain and as a database check.
-  Still open: D1 (tenant consistency) and D2 (lifecycle).
+  D2 (lifecycle) was accepted as recommended the same day: see
+  [ADR-0015](../adr/0015-fund-lifecycle.md). Still open: D1 (tenant consistency).
 - **Not present:** there is no `contributions` or `payments` context yet
   (CONFIRMED, `backend/contexts/`; `overview.md`, "Not yet built").
 

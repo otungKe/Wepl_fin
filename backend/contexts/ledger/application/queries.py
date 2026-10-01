@@ -37,6 +37,13 @@ def fund_position(fund_id: int, currency: str = "KES") -> FundPosition:
                         unexplained_out=get(AccountPurpose.UNEXPLAINED_OUT))
 
 
+def fund_holds_nothing(fund_id: int) -> bool:
+    """Whether every account of the fund, in every currency, is at zero:
+    no member, the group or the custodian holds anything in it."""
+    return not (JournalLine.objects.filter(account__fund_id=fund_id).values("account_id")
+                .annotate(v=_SIGNED).exclude(v=0).exists())
+
+
 def trial_balance(fund_id: int | None = None) -> Decimal:
     """Total debits minus total credits: zero whenever the ledger is sound."""
     qs = JournalLine.objects.all() if fund_id is None else JournalLine.objects.filter(account__fund_id=fund_id)
