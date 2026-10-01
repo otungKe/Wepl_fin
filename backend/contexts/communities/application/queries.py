@@ -14,7 +14,11 @@ def group_view(group_id: int) -> GroupView:
 
 
 def fund_view(fund_id: int) -> FundView:
-    f = Fund.objects.get(pk=fund_id)
+    """Raises CommunityError for an unknown fund or, under row-level
+    security, another tenant's: the two are indistinguishable."""
+    f = Fund.objects.filter(pk=fund_id).first()
+    if f is None:
+        raise CommunityError(f"Unknown fund {fund_id}.")
     return FundView(id=f.pk, group_id=f.group_id, name=f.name, currency=f.currency)
 
 

@@ -18,6 +18,11 @@
 
   I also ran a probe against PostgreSQL 16 as `wepl_app`, inside a
   transaction that was rolled back afterwards.
+- **Status:** Harry said "Implement" on 2026-10-01. B1–B6 and tests 1–9 of
+  section N are in: migration `communities 0010`, `domain/fund.py`,
+  `funds.py`, `fund_view`, and tests in `communities/tests/{unit/test_fund,
+  integration/test_funds}.py` and `tests/test_concurrency.py`. Still open:
+  C1 (case of names), C5 (the default name), and D1–D3.
 - **Not present:** there is no `contributions` or `payments` context yet
   (CONFIRMED, `backend/contexts/`; `overview.md`, "Not yet built").
 

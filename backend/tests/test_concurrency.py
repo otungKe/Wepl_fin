@@ -12,7 +12,9 @@ import unittest
 from django.db import connection
 
 from contexts.audit.public import history
-from contexts.communities.public import CommunityError, add_member, create_group, leave_group, members, membership
+from contexts.communities.infrastructure.models import Fund
+from contexts.communities.public import (CommunityError, add_member, create_group, leave_group, members, membership,
+                                         open_fund)
 from contexts.tenancy.public import tenant
 
 JOINERS = 8
@@ -48,6 +50,25 @@ class ConcurrentJoinTests(unittest.TestCase):
             self.assertEqual(membership(m.id).status, "left")
             left_events = [e for e in history(target_type="membership", target_id=m.id) if e["action"] == "member.left"]
         self.assertEqual(len(left_events), 1)
+
+
+class ConcurrentFundTests(unittest.TestCase):
+    """The unique (group, name) constraint decides, not an earlier check."""
+
+    def test_the_same_name_opened_at_once_gives_one_fund(self):
+        group = create_group("Concurrent funds", actor="test")
+        errors = run_together(lambda n: open_fund(group.id, name="Welfare", actor="test"), group.tenant_id)
+        self.assertEqual(len(errors), JOINERS - 1)
+        self.assertTrue(all(isinstance(e, CommunityError) and "already has" in str(e) for e in errors), errors)
+        with tenant(group.tenant_id):
+            self.assertEqual(Fund.objects.filter(group_id=group.id).count(), 1)
+
+    def test_different_names_opened_at_once_all_succeed(self):
+        group = create_group("Concurrent fund names", actor="test")
+        errors = run_together(lambda n: open_fund(group.id, name=f"Fund {n}", actor="test"), group.tenant_id)
+        self.assertEqual(errors, [])
+        with tenant(group.tenant_id):
+            self.assertEqual(Fund.objects.filter(group_id=group.id).count(), JOINERS)
 
 
 def run_together(action, tenant_id) -> list[Exception]:
