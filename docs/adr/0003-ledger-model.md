@@ -1,6 +1,7 @@
 # ADR-0003: Double-entry, append-only ledger
 
-- **Status:** Proposed (2026-09-30)
+- **Status:** Accepted (Harry, 2026-10-03), after every item of his acceptance
+  checklist passed; evidence in `docs/architecture/adr-0003-acceptance.md`.
 
 ## Decision
 
