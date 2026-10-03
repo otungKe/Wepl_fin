@@ -18,5 +18,9 @@ class OutboxEvent(models.Model):
     last_error = models.TextField(blank=True, default="")
 
     class Meta:
-        indexes = [models.Index(fields=["delivered_at", "id"])]
+        # notify() looks a dedupe key up with no tenant predicate; row-level
+        # security's OR cannot enter the tenant-leading unique index, so
+        # without this every alert scanned every tenant's outbox (ADR-0016).
+        indexes = [models.Index(fields=["delivered_at", "id"]),
+                   models.Index(fields=["dedupe_key"], name="outbox_dedupe_key")]
         constraints = [models.UniqueConstraint(fields=["tenant", "dedupe_key"], name="outbox_dedupe_key_unique")]

@@ -64,6 +64,8 @@ class Proposal(models.Model):
                                    | Q(allocation="pro_rata", charged_member__isnull=True),
                                    name="gov_proposal_allocation_consistent"),
         ]
+        # The request-key lookup, for the reason given on the outbox (ADR-0016).
+        indexes = [models.Index(fields=["request_key"], name="gov_proposal_request_key")]
 
 
 class Approval(models.Model):
