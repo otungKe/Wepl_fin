@@ -11,7 +11,7 @@
 - **New tests** are marked *new*. They are in `tests/test_ledger_acceptance.py`
   and `tests/test_ledger_committed.py`.
 
-ADR-0003 is **not** marked accepted here. That is Harry's call.
+Harry accepted ADR-0003 on 2026-10-03 on this evidence.
 
 | # | Item | Result | Proven by |
 |---|---|---|---|

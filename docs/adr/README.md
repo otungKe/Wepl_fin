@@ -4,7 +4,7 @@
 |---|---|---|
 | [0001](0001-modular-monolith-on-django-and-postgres.md) | Modular monolith on Django 5.2 LTS and PostgreSQL; no Redis or Celery | Django 5.2 LTS accepted; rest proposed |
 | [0002](0002-bounded-contexts.md) | The contexts, their layers and their public surfaces | Proposed |
-| [0003](0003-ledger-model.md) | Double-entry, append-only ledger enforced in the domain and in PostgreSQL; a reversal is reversible, each entry at most once | Proposed; reversal rule decided by Harry |
+| [0003](0003-ledger-model.md) | Double-entry, append-only ledger enforced in the domain and in PostgreSQL; a reversal is reversible, each entry at most once | **Accepted** (Harry, 2026-10-03) |
 | [0004](0004-cross-context-references.md) | How contexts refer to each other's records | Proposed |
 | [0005](0005-group-as-isolation-boundary.md) | The group is the data-isolation boundary until tenancy is decided | Superseded in part by 0009 |
 | [0006](0006-custody-detective-control.md) | Pilot custody: groups hold money at I&M; WEPL reconciles and alerts | Proposed |
