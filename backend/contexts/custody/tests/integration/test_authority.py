@@ -10,7 +10,7 @@ from contexts.custody.infrastructure.models import LineResolution, StatementLine
 from contexts.custody.public import CustodyError, attribute_payment, explain_outflow, record_opening_balances
 from contexts.governance.infrastructure.models import Mandate
 from contexts.ledger.public import trial_balance
-from simulators.im_bank import bank
+from simulators.custodian_bank import bank
 from tests.scenario import Scenario
 
 N = "0012345678901"

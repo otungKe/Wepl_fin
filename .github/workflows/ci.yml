@@ -44,4 +44,4 @@ jobs:
         working-directory: backend
         run: |
           python manage.py migrate
-          python manage.py demo_im_pilot
+          python manage.py demo_custody_pilot

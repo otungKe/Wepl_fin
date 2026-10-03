@@ -13,8 +13,8 @@ from contexts.governance.public import Capability, adopt_constitution, decide, g
 from contexts.notifications.public import topics_since
 from contexts.shared_kernel.money import Money
 from contexts.tenancy.public import tenant
-from simulators.im_bank import bank
-from simulators.im_bank.connector import Faults, SimulatorConnector
+from simulators.custodian_bank import bank
+from simulators.custodian_bank.connector import Faults, SimulatorConnector
 
 PEOPLE = [
     ("0712000001", "Wanjiku Kamau", "Chair", "8000"),
@@ -74,7 +74,7 @@ class Command(BaseCommand):
             opening += Money(b)
         bank.open_account(number, name, opening.amount)
         ea = custody.link_external_account(fund.id, institution="Custodian Bank", account_number=number,
-                                           account_name=name, connector="im_simulator", actor="operator")
+                                           account_name=name, connector="bank_simulator", actor="operator")
         custody.record_opening_balances(ea.id, statement_balance=opening.amount, by=members["Otieno Ouma"].id,
                                         confirmed_by=members["Wanjiku Kamau"].id,
                                         member_balances={members[n].id: b for _, n, _, b in PEOPLE})

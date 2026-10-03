@@ -9,7 +9,7 @@ from contexts.ledger.infrastructure.models import JournalEntry, JournalLine
 from contexts.notifications.infrastructure.models import OutboxEvent
 from contexts.custody.public import attribute_payment, group_summary
 from contexts.shared_kernel.money import Money
-from simulators.im_bank import bank
+from simulators.custodian_bank import bank
 from tests.scenario import Scenario
 
 N = "0012345678901"

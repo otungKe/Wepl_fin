@@ -36,7 +36,7 @@ WEPL_ENABLE_SIMULATOR = os.environ.get("WEPL_ENABLE_SIMULATOR", "1") == "1"
 if not DEBUG and WEPL_ENABLE_SIMULATOR:
     raise RuntimeError("WEPL_ENABLE_SIMULATOR must be 0 when DEBUG is off.")
 if WEPL_ENABLE_SIMULATOR:
-    INSTALLED_APPS.append("simulators.im_bank.apps.ImBankSimulatorConfig")
+    INSTALLED_APPS.append("simulators.custodian_bank.apps.CustodianBankSimulatorConfig")
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -80,4 +80,4 @@ LOGGING = {
 # name. Loaded by name so no context imports a particular integration.
 WEPL_CONNECTORS = {}
 if WEPL_ENABLE_SIMULATOR:
-    WEPL_CONNECTORS["im_simulator"] = "simulators.im_bank.connector.SimulatorConnector"
+    WEPL_CONNECTORS["bank_simulator"] = "simulators.custodian_bank.connector.SimulatorConnector"

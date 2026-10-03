@@ -225,7 +225,7 @@ class OtherContextsAndAClosedFundTests(TestCase):
         closed = close_fund(open_fund(s.group.id, name="Closed", actor="t").id, actor="t")
         with self.assertRaisesMessage(CustodyError, "is closed"):
             link_external_account(closed.id, institution="Custodian Bank", account_number="0099", account_name="x",
-                                  connector="im_simulator", actor="t")
+                                  connector="bank_simulator", actor="t")
         with self.assertRaisesMessage(DatabaseError, "is closed"), transaction.atomic():
             ExternalAccount.objects.create(group_id=s.group.id, fund_id=closed.id, institution="Custodian Bank",
-                                           account_number="0099", account_name="x", connector="im_simulator")
+                                           account_number="0099", account_name="x", connector="bank_simulator")

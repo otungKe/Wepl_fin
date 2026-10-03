@@ -11,7 +11,7 @@ from contexts.custody.public import CustodyError, attribute_payment, explain_out
 from contexts.governance.infrastructure.models import Approval, Mandate, Proposal
 from contexts.governance.public import GovernanceError, decide, propose_withdrawal
 from contexts.tenancy.public import cross_tenant
-from simulators.im_bank import bank
+from simulators.custodian_bank import bank
 from tests.scenario import SIGNATORY, Scenario
 
 

@@ -17,7 +17,7 @@ from contexts.ledger.public import member_balances
 from contexts.tenancy.contract import TenantScope
 from contexts.tenancy.infrastructure.session import database_tenant, role_bypasses_rls
 from contexts.tenancy.public import TenancyError, cross_tenant, current_tenant, provision_tenant, tenant
-from simulators.im_bank import bank
+from simulators.custodian_bank import bank
 from tests.scenario import SIGNATORY, Scenario
 
 OURS = {"audit", "tenancy", "identity", "communities", "governance", "ledger", "custody", "notifications", "simulator"}

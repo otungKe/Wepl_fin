@@ -14,7 +14,7 @@ from contexts.ledger.public import (account_balance, fund_position, member_balan
                                     trial_balance)
 from contexts.shared_kernel.money import Money
 from contexts.tenancy.public import cross_tenant
-from simulators.im_bank import bank
+from simulators.custodian_bank import bank
 from tests.scenario import Scenario
 
 D, C = Side.DEBIT, Side.CREDIT

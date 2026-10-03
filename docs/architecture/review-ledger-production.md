@@ -147,7 +147,7 @@ database guarantee, which was already there.
 - With `posting.py` and `journal.py` reverted, the new tests gave 2
   failures and 3 errors, as marked above.
 - `makemigrations --check --dry-run`: no changes.
-- `demo_im_pilot`: runs, and the neighbour sees 0 rows.
+- `demo_custody_pilot`: runs, and the neighbour sees 0 rows.
 
 ## 9. Remaining risks
 

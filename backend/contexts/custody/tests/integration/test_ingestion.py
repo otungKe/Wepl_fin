@@ -8,7 +8,7 @@ from contexts.custody.public import (CustodyError, attribute_payment, explain_ou
 from contexts.governance.infrastructure.models import Mandate
 from contexts.notifications.infrastructure.models import OutboxEvent
 from contexts.shared_kernel.money import Money
-from simulators.im_bank import bank
+from simulators.custodian_bank import bank
 from tests.scenario import RULES, Scenario
 
 N = "0012345678901"

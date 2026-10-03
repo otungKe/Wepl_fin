@@ -87,7 +87,7 @@ context owns and does not own is in ADR-0002 and in each context's
 | One group cannot touch another's money | `tests/test_isolation.py` |
 | Auditability | `custody.line_trail` goes from a bank transaction to its journal entries and mandate; `audit.history` gives every governance decision |
 | Architecture stays as designed | `tests/test_architecture.py` |
-| Demo | `python manage.py demo_im_pilot` |
+| Demo | `python manage.py demo_custody_pilot` |
 
 ## Not yet built
 

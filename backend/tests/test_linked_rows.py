@@ -16,7 +16,7 @@ from contexts.ledger.infrastructure.models import Account, JournalEntry
 from contexts.ledger.public import post_journal
 from contexts.shared_kernel.money import Money
 from contexts.tenancy.public import cross_tenant
-from simulators.im_bank import bank
+from simulators.custodian_bank import bank
 from tests.scenario import Scenario
 from tests.test_tenancy import sql, tenant_scoped_tables
 

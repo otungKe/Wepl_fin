@@ -34,7 +34,7 @@ Each context has, only where needed:
 - `contract.py`: pure types that other contexts may use, even from their domain.
 - `public.py`: the only module other contexts may import.
 
-`backend/simulators/im_bank` is not a context. It stands in for the custodian bank in
+`backend/simulators/custodian_bank` is not a context. It stands in for the custodian bank in
 tests and demos, and no context imports it.
 
 **Naming.** The money-holding context is called **custody**, not "payments".

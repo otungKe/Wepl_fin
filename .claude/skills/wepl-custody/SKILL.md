@@ -69,14 +69,14 @@ reconciles; the alert is the control, not the reconciliation.
 
 ## The simulator and the demo
 
-- **`backend/simulators/im_bank/bank.py`:**
+- **`backend/simulators/custodian_bank/bank.py`:**
   - `open_account`, `deposit` (paybill 542542 style), `withdraw`,
     `credit_interest`, `charge`, `balance`.
   - The bank refuses overdrafts.
 - **`connector.py::SimulatorConnector(Faults(duplicate_rate, withhold_rate,
   reorder, seed))`:** a faulty push feed. `sweep=True` is the complete,
   ordered end-of-day statement.
-- **`python manage.py demo_im_pilot`:** the 20-minute custody demo. It uses public
+- **`python manage.py demo_custody_pilot`:** the 20-minute custody demo. It uses public
   surfaces only; keep it that way, because it is also CI's end-to-end check.
 
 ## Do not assume

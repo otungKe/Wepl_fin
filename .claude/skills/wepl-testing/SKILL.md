@@ -109,7 +109,7 @@ For money workflows, cover:
 - **wrong group** (`tests/test_isolation.py`);
 - provider failure (`notifications/tests/integration/test_outbox.py::Flaky`);
 - crash and reprocess (`custody/tests/integration/test_faults.py`);
-- faulty feed (`simulators.im_bank.connector.Faults`).
+- faulty feed (`simulators.custodian_bank.connector.Faults`).
 
 To prove a database rule, bypass the domain and write through the ORM or raw
 SQL. Otherwise you are testing the guard above it, not the rule.
@@ -127,7 +127,7 @@ SQL. Otherwise you are testing the guard above it, not the rule.
    - no signals;
    - no mutable money counters;
    - every ADR indexed.
-3. `migrate` and `demo_im_pilot` end to end.
+3. `migrate` and `demo_custody_pilot` end to end.
 
 There is no coverage gate, linter or type checker yet.
 

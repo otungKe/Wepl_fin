@@ -8,8 +8,8 @@ from contexts.governance.public import Capability, decide, eligible_approvers, g
 from contexts.ledger.public import fund_position, member_balances, trial_balance
 from contexts.shared_kernel.money import Money
 from contexts.tenancy.public import tenant
-from simulators.im_bank import bank
-from simulators.im_bank.connector import SimulatorConnector
+from simulators.custodian_bank import bank
+from simulators.custodian_bank.connector import SimulatorConnector
 
 RULES = {
     "approvals": [{"up_to": "20000", "approvers": "designated", "required": 2},
@@ -46,7 +46,7 @@ class Scenario:
             self.account = account
             bank.open_account(account, name, opening_balance)
             self.ea = link_external_account(self.fund.id, institution="Custodian Bank", account_number=account,
-                                            account_name=name, connector="im_simulator", actor="test")
+                                            account_name=name, connector="bank_simulator", actor="test")
 
     def acting(self):
         """This scenario's tenant context."""
