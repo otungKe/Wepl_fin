@@ -127,6 +127,7 @@ class ReconciliationRun(models.Model):
     lines_seen = models.PositiveIntegerField()
     lines_unresolved = models.PositiveIntegerField()
     sequence_gaps = models.JSONField(default=list)
+    balance_breaks = models.JSONField(default=list)  # sequences where the running balance does not follow
     open_alerts = models.PositiveIntegerField()
     balanced = models.BooleanField()
     operation_id = models.CharField(max_length=64, blank=True, default="")

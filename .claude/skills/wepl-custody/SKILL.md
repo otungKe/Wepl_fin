@@ -46,7 +46,12 @@ the questions still open with the bank.
        notification to **every** active member.
 4. **reconcile.** It compares ledger `custody_cash` with the latest running
    balance, finds sequence gaps and unresolved lines, and records a
-   `ReconciliationRun`. Anything off raises a `recon_difference` alert.
+   `ReconciliationRun`. It also walks the running balance line by line
+   (`balance_breaks`): each printed balance must equal the one before plus or
+   minus the line. That finds a missing line where the numbering cannot,
+   because the custodian's printed statements carry no transaction id or
+   sequence (samples of 2026-10-03), and a feed's numbering may be derived.
+   Anything off raises a `recon_difference` alert.
 
 "Balanced" means the books equal the bank. An unmatched outflow still
 reconciles; the alert is the control, not the reconciliation.

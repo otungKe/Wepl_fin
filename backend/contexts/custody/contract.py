@@ -50,6 +50,7 @@ class ReconciliationView:
     lines_seen: int
     lines_unresolved: int
     sequence_gaps: list
+    balance_breaks: list
     open_alerts: int
     balanced: bool
 

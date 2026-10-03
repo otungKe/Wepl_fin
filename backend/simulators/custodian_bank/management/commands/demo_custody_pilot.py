@@ -50,6 +50,8 @@ class Command(BaseCommand):
                  f"- unexplained {run.unexplained_out}")
         if run.sequence_gaps:
             self.say(f"  missing bank sequence numbers: {run.sequence_gaps}")
+        if run.balance_breaks:
+            self.say(f"  running balance broken at sequence numbers: {run.balance_breaks}")
 
     def handle(self, *args, seed, **options):
         started = timezone.now()
