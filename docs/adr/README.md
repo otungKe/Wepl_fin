@@ -7,7 +7,7 @@
 | [0003](0003-ledger-model.md) | Double-entry, append-only ledger enforced in the domain and in PostgreSQL; a reversal is reversible, each entry at most once | **Accepted** (Harry, 2026-10-03) |
 | [0004](0004-cross-context-references.md) | How contexts refer to each other's records | Proposed |
 | [0005](0005-group-as-isolation-boundary.md) | The group is the data-isolation boundary until tenancy is decided | Superseded in part by 0009 |
-| [0006](0006-custody-detective-control.md) | Pilot custody: groups hold money at I&M; WEPL reconciles and alerts | Proposed |
+| [0006](0006-custody-detective-control.md) | Pilot custody: groups hold money at the custodian bank; WEPL reconciles and alerts | Proposed |
 | [0007](0007-application-layer-uses-own-orm.md) | Shortcut: application code uses its own context's ORM models directly | Proposed, shortcut |
 | [0008](0008-who-may-act-before-login.md) | Only an active official (since 0011: a `correct_records` holder) may correct the books; opening balances need two; simulator refused in production | Proposed |
 | [0009](0009-tenancy-with-row-level-security.md) | Multi-tenancy: explicit tenant context, application checks, forced PostgreSQL row-level security | Proposed (implements Harry's decisions) |

@@ -65,7 +65,7 @@ But three things the design depends on are not held by PostgreSQL:
 normal path.
 
 **Verdict:** sound, but it needs significant hardening before it is the
-financial record I&M is asked to rely on. It does not need a redesign.
+financial record the custodian bank is asked to rely on. It does not need a redesign.
 
 ## `models.py`
 
@@ -225,7 +225,7 @@ fine while custody is the only writer.
   accounts are invisible. Zero visible currencies are unbalanced, so it
   passes.
 - **P5:** two tenant-A lines attached to **tenant B's** entry. Under A they
-  balance. In any cross-tenant read (reconciliation, an I&M report), B's
+  balance. In any cross-tenant read (reconciliation, a custodian report), B's
   entry now has foreign lines.
 - **P3:** a custody-cash account with a credit normal side.
 - **P6:** a tenant-A entry recorded as reversing tenant B's entry. It also

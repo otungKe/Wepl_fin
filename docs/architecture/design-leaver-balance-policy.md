@@ -218,7 +218,7 @@ is in *which rule a future posting uses*.
    default" principle.
 9. **Time weighting.** Interest is split by balances at the time of the
    credit, not over the period it accrued (CONFIRMED). Is that acceptable to
-   groups and to I&M? UNKNOWN.
+   groups and to the custodian bank? UNKNOWN.
 
 ## G. ADRs required before implementation
 

@@ -118,7 +118,7 @@ NOT NULL tenant (`tests/test_tenancy.py`).
 | Audit events | TENANT_SCOPED, **tenant-less rows allowed** | Unusual case: system events (provisioning, cross-tenant access) belong to no tenant and are visible only cross-tenant |
 | People (`identity.Person`) | USER_SCOPED | Unusual case: one person may be in groups in several tenants. Tenants reach a person only through a membership. With no login yet, there is no user context to enforce, so this is an application rule for now |
 | Tenants | SYSTEM | the platform's own list |
-| Simulated bank | GLOBAL | a test double for I&M's system, not WEPL data; never installed in production (ADR-0008) |
+| Simulated bank | GLOBAL | a test double for the custodian bank's system, not WEPL data; never installed in production (ADR-0008) |
 
 ### What the application layer still does (decision 5)
 

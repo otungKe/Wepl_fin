@@ -45,7 +45,7 @@ def deposit(number, amount, *, msisdn, name, reference=""):
 
 
 def withdraw(number, amount, *, narration, payee_name="", payee_msisdn=""):
-    """Officials pay out in I&M's own channels, under the bank's dual authorisation."""
+    """Officials pay out in the bank's own channels, under its dual authorisation."""
     return _post(number, "withdrawal", amount, inflow=False, narration=narration, counterparty_name=payee_name,
                  counterparty_msisdn=payee_msisdn)
 

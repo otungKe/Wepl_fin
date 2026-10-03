@@ -35,7 +35,7 @@ try.
 | Cross-context: properties, isolation, architecture | `backend/tests/` | varies |
 
 `backend/tests/scenario.py::Scenario` builds a group, members, a constitution
-and a simulated I&M account **through public surfaces only**. Use it rather than
+and a simulated custodian account **through public surfaces only**. Use it rather than
 creating rows by hand.
 
 **Tenant context in tests (ADR-0009).**
@@ -139,4 +139,4 @@ raising the line cap without an ADR.
 - No cross-process concurrency suite: two `post_journal` calls on one key from
   two connections; two workers racing `execute_mandate`; two relays claiming
   one outbox row.
-- No test against a real I&M statement format; the simulator stands in.
+- No test against a real custodian statement format; the simulator stands in.

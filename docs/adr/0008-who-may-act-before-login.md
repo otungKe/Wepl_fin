@@ -10,7 +10,7 @@ free-text `actor` string, so anyone who could call them could move money
 between member claims and have any name written to the audit trail. Those are
 the three commands that change what members are owed without a vote.
 
-The simulated I&M bank was also installed by default. Nothing stopped it
+The simulated custodian bank was also installed by default. Nothing stopped it
 running in a production process, beside real accounts.
 
 ## Decision
@@ -78,4 +78,4 @@ running in a production process, beside real accounts.
 
 - Authentication lands: `by` then comes from the session, never from input.
 - Operator accounts land: setup commands take an operator with a capability.
-- I&M asks for maker-checker on attribution as well.
+- The custodian bank asks for maker-checker on attribution as well.

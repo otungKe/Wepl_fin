@@ -1,4 +1,4 @@
-"""The 20-minute I&M demo from the custody design, as one repeatable script.
+"""The 20-minute custody demo from the custody design, as one repeatable script.
 It drives the system only through each context's public surface, exactly as
 the product will. Runs against the configured database, with a fresh group."""
 from collections import Counter
@@ -31,7 +31,7 @@ RULES = {"approvals": [{"up_to": "20000", "approvers": "designated", "required":
 
 
 class Command(BaseCommand):
-    help = "Run the scripted I&M custody demo with a simulated Chama Account and a faulty feed."
+    help = "Run the scripted custody demo with a simulated Chama Account and a faulty feed."
 
     def add_arguments(self, parser):
         parser.add_argument("--seed", type=int, default=42)
@@ -61,7 +61,7 @@ class Command(BaseCommand):
         self.isolation(group.tenant_id, number)
 
     def pilot(self, group, name, number, started, seed):
-        self.step("1. Onboarding: group (its own tenant), fund, constitution, members, existing I&M Chama Account")
+        self.step("1. Onboarding: group (its own tenant), fund, constitution, members, existing Chama Account at the custodian bank")
         fund = open_fund(group.id, name="Main savings", actor="operator")
         version = adopt_constitution(group.id, RULES, actor="operator")
         members = {n: add_member(group.id, msisdn=m, name=n, title=t, actor="operator") for m, n, t, _ in PEOPLE}
@@ -73,7 +73,7 @@ class Command(BaseCommand):
         for *_, b in PEOPLE:
             opening += Money(b)
         bank.open_account(number, name, opening.amount)
-        ea = custody.link_external_account(fund.id, institution="I&M Bank Kenya", account_number=number,
+        ea = custody.link_external_account(fund.id, institution="Custodian Bank", account_number=number,
                                            account_name=name, connector="im_simulator", actor="operator")
         custody.record_opening_balances(ea.id, statement_balance=opening.amount, by=members["Otieno Ouma"].id,
                                         confirmed_by=members["Wanjiku Kamau"].id,

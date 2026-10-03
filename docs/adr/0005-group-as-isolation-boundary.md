@@ -9,7 +9,7 @@
 Rule 23 makes tenancy a security boundary. The tenancy model is not yet
 decided (UNKNOWN). The candidates include:
 - each group as its own tenant;
-- institutions (for example I&M, or a SACCO serving many groups) as tenants
+- institutions (for example the custodian bank, or a SACCO serving many groups) as tenants
   over their groups (INFERRED from the strategy document's "institutions as a
   second customer").
 

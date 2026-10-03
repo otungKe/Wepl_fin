@@ -29,7 +29,7 @@ INSTALLED_APPS = [
     "contexts.custody.infrastructure.apps.CustodyConfig",
 ]
 
-# The simulated I&M bank, for tests and the investor demo. No context imports
+# The simulated custodian bank, for tests and the investor demo. No context imports
 # it. It fakes a bank, so it must never run beside real money: with DEBUG off
 # the process refuses to start unless WEPL_ENABLE_SIMULATOR=0.
 WEPL_ENABLE_SIMULATOR = os.environ.get("WEPL_ENABLE_SIMULATOR", "1") == "1"

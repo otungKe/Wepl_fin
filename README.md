@@ -5,8 +5,8 @@ money and the approvals (mandates) that authorise every payout. Each day it
 reconciles that register against the account where the money is actually
 held.
 
-In the pilot, WEPL never holds money. Each group keeps its money in its own I&M
-Bank Chama Account. WEPL reads the statement, credits every pay-in to a member,
+In the pilot, WEPL never holds money. Each group keeps its money in its own
+Chama Account at the custodian bank. WEPL reads the statement, credits every pay-in to a member,
 matches every payout to an approved mandate, and alerts every member when
 money leaves without one.
 
@@ -23,7 +23,7 @@ psql -U postgres -c "CREATE ROLE wepl_app LOGIN PASSWORD 'wepl' CREATEDB NOSUPER
 createdb -U postgres -O wepl_app wepl   # DB_NAME, DB_USER, DB_PASSWORD, DB_HOST, DB_PORT override the defaults
 python manage.py migrate
 python manage.py test              # the full suite, against real Postgres
-python manage.py demo_im_pilot     # the scripted I&M demo
+python manage.py demo_im_pilot     # the scripted custody demo
 ```
 
 | Command | What it does |
@@ -41,7 +41,7 @@ backend/
   config/            Django settings (the framework sits at the edges)
   contexts/          one package per bounded context
     identity/  communities/  governance/  ledger/  custody/  notifications/  audit/  shared_kernel/
-  simulators/im_bank a simulated I&M Chama Account, for tests and the demo only
+  simulators/im_bank a simulated Chama Account at the custodian bank, for tests and the demo only
   persistence/       generic PostgreSQL helpers for migrations
   tests/             cross-context suites: properties, isolation, architecture
 docs/

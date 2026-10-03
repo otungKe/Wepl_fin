@@ -40,7 +40,7 @@ jobs:
         working-directory: backend
       - run: python manage.py test -v 2
         working-directory: backend
-      - name: Run the I&M demo end to end
+      - name: Run the custody demo end to end
         working-directory: backend
         run: |
           python manage.py migrate

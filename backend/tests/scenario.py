@@ -45,7 +45,7 @@ class Scenario:
                     grant(self.m[-1].id, c, actor="test")
             self.account = account
             bank.open_account(account, name, opening_balance)
-            self.ea = link_external_account(self.fund.id, institution="I&M Bank Kenya", account_number=account,
+            self.ea = link_external_account(self.fund.id, institution="Custodian Bank", account_number=account,
                                             account_name=name, connector="im_simulator", actor="test")
 
     def acting(self):
@@ -80,7 +80,7 @@ class Scenario:
             return fund_position(self.fund.id)
 
     def assert_sound(self, tc):
-        """The invariants I&M is asked to rely on."""
+        """The invariants the custodian bank is asked to rely on."""
         with self.acting():
             return self._assert_sound(tc)
 

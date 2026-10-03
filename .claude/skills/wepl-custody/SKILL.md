@@ -3,16 +3,16 @@ name: wepl-custody
 description: How Wepl_fin watches money it does not hold — custodian accounts,
   statement ingestion (duplicates, conflicts, gaps), attribution of pay-ins,
   mandate matching for payouts, unmatched-outflow alerts, corrections, opening
-  balances and reconciliation, plus the I&M simulator and demo. Use when touching
-  backend/contexts/custody, a connector, the simulator, or the I&M demo.
+  balances and reconciliation, plus the bank simulator and demo. Use when touching
+  backend/contexts/custody, a connector, the simulator, or the custody demo.
 ---
 
 # Wepl_fin custody
 
-In the pilot, groups keep their money in their own I&M Chama Accounts, and WEPL
+In the pilot, groups keep their money in their own Chama Accounts at the custodian bank, and WEPL
 never holds or moves it (ADR-0006, custody Model A). The design is in
 `/mnt/project-files/wepl-custody/wepl-custody-design-im.md`, which includes
-the questions still open with I&M.
+the questions still open with the bank.
 
 ## The pipeline
 
@@ -76,14 +76,14 @@ reconciles; the alert is the control, not the reconciliation.
 - **`connector.py::SimulatorConnector(Faults(duplicate_rate, withhold_rate,
   reorder, seed))`:** a faulty push feed. `sweep=True` is the complete,
   ordered end-of-day statement.
-- **`python manage.py demo_im_pilot`:** the 20-minute I&M demo. It uses public
+- **`python manage.py demo_im_pilot`:** the 20-minute custody demo. It uses public
   surfaces only; keep it that way, because it is also CI's end-to-end check.
 
 ## Do not assume
 
-- **I&M formats are unknown.** The real I&M statement format, push
+- **Custodian formats are unknown.** The real custodian statement format, push
   notifications and APIs are UNKNOWN until Harry obtains a sample export and
-  answers from I&M. The simulator's field names are placeholders.
+  answers from the bank. The simulator's field names are placeholders.
 - **Nothing has seen real money.** No invariant here has been exercised
   against a real bank. "Correct" means "correct under test and simulation".
 - **Payouts are not WEPL's.** There is no payout submission (Model C); that

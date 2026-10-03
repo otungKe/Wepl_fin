@@ -21,7 +21,7 @@ GROUP, FUND, MEMBERSHIP, MANDATE = "communities.Group", "communities.Fund", "com
 
 
 class ExternalAccount(models.Model):
-    """A group's account at a custodian, e.g. an I&M Chama Account."""
+    """A group's account at a custodian, e.g. a Chama Account at the custodian bank."""
 
     tenant_scope = TenantScope.TENANT_SCOPED
     tenant = tenant_column()

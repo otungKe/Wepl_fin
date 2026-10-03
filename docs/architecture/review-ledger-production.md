@@ -180,7 +180,7 @@ database guarantee, which was already there.
    enough at the largest expected group.
 2. **The child-table tenant-consistency ADR** (C1), so the guarantee the
    ledger has holds for every table that refers to it.
-3. **A reconciliation run against a real I&M statement.** The ledger's side
+3. **A reconciliation run against a real custodian statement.** The ledger's side
    is tested, but the custodian's file format is still unknown (waiting on
    the sample).
 4. **Operational checks:**
@@ -207,7 +207,7 @@ above are unchanged.
 |---|---|---|---|
 | 1 | Balance recalculation | **Measured; no checkpoints.** The threshold is 100,000 lines in one fund, watched nightly. The measurement found and fixed a real problem: two lookups scanned every tenant's rows. | ADR-0016; `benchmarks/ledger_balances.py`; ledger 0007 |
 | 2 | Linked-row tenant consistency | **Decided (ADR-0017), not yet implemented.** A probe showed the gap is real. | ADR-0017 |
-| 3 | I&M reconciliation | **Waiting on the sample.** No I&M statement format or parser exists yet. | Acceptance criteria below |
+| 3 | Custodian reconciliation | **Waiting on the sample.** No custodian statement format or parser exists yet. | Acceptance criteria below |
 | 4 | Nightly integrity check | **Built.** `check_ledger_integrity` checks every fund in every tenant, records an append-only result, audits a failure, queues an `ops.ledger_integrity_failure` alert and exits non-zero. On the demo data: 16 fund books checked, 0 failed. | ledger 0006; `test_integrity.py` (5 tests) |
 | 5 | Reversal of a reversal | **Rule recorded:** allowed, and each entry is reversed at most once. | ADR-0003; `test_a_reversal_is_itself_reversible_once` |
 
@@ -237,7 +237,7 @@ tenant.
 
 Each is a one-index fix (ADR-0016, Consequences).
 
-### What a real I&M reconciliation test must prove (item 3)
+### What a real custodian reconciliation test must prove (item 3)
 
 The test is written when the sample arrives. It will:
 1. Parse the real statement (its format decides the connector).
@@ -253,7 +253,7 @@ The test is written when the sample arrives. It will:
 
 Today, steps 2–6 are proven only against the simulator (custody
 `test_ingestion.py`, `test_faults.py`). Until a real file is reconciled, the
-claim that the ledger reconciles with I&M is INFERRED, not CONFIRMED.
+claim that the ledger reconciles with the custodian is INFERRED, not CONFIRMED.
 
 ### Production-readiness assessment
 
@@ -276,7 +276,7 @@ reproduced finding, not a hypothetical:
    tenant that points at another tenant's group, member or fund, including
    a ledger entry through `post_journal`. Every current command prevents
    this in application code, but the database does not.
-2. **A real I&M statement reconciled** (item 3). This is the custodian half
+2. **A real custodian statement reconciled** (item 3). This is the custodian half
    of "the books are right".
 3. **Alerts reaching a person.**
    - Today `ops.*` alerts go to the outbox and the log notifier (SMS is on
@@ -287,7 +287,7 @@ reproduced finding, not a hypothetical:
 4. **The two remaining RLS-index lookups fixed** (outbox dedupe, proposal
    request key). It is the same measured cause, and it slows every alert and
    proposal as the platform grows.
-5. **The benchmark re-run on I&M's production hardware and PostgreSQL
+5. **The benchmark re-run on the custodian bank's production hardware and PostgreSQL
    settings.** Today's numbers come from a 4 vCPU container with default
    settings.
 6. **Restore drills.** A backup must be shown to restore with every trigger

@@ -26,8 +26,8 @@ Harry accepted ADR-0003 on 2026-10-03 on this evidence.
 
 ## Limits of this evidence
 
-- **Real I&M statement.** Reconciliation (item 7) is proven against the I&M
-  simulator, not a real I&M statement. That is still waiting on the sample.
+- **Real custodian statement.** Reconciliation (item 7) is proven against the bank
+  simulator, not a real custodian statement. That is still waiting on the sample.
 - **Concurrency scale.** The concurrency tests (items 4–6) use 8 connections
   on one machine. They show the database decides each race. They are not a
   load test.
