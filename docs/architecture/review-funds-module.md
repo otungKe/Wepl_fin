@@ -202,7 +202,7 @@ Custody       ExternalAccount (fund ↔ custodian account), statements, matching
 Ledger        Account (keyed by fund_id + purpose [+ member | external account] + currency), JournalEntry/Line
               └ the only owner of balances.
 Contributions (not built) cycles, arrears, goals; §3's "purpose" and "contribution rule" per fund
-Payments      (not built) payouts through I&M's APIs
+Payments      (not built) payouts through the custodian bank's APIs
 ```
 
 All CONFIRMED from the code, except the two contexts not yet built, which

@@ -62,7 +62,7 @@ Audited 2026-09-30, against [engineering-guidelines.md](engineering-guidelines.m
 | 53 | Performance keeps integrity | Meets | Meets |
 | 54 | Integrity over convenience | Meets | Meets |
 | 55 | Don't rebuild the old system blindly | Meets | Meets: only the ledger design was carried over, deliberately |
-| 56 | Don't invent requirements | Partly | Meets: unknowns are marked in the ADRs (who the tenant is, I&M format, legal) |
+| 56 | Don't invent requirements | Partly | Meets: unknowns are marked in the ADRs (who the tenant is, custodian statement format, legal) |
 | 57 | Evidence labels | Partly | Meets in the ADRs |
 | 58 | ADRs for disagreements | **No** | Meets: Django 5.2 vs 6.0 recorded in ADR-0001 |
 | 59 | Refactoring preserves behaviour | — | Meets: every earlier test was ported, and the demo output is unchanged |

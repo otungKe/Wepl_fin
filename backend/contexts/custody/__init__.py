@@ -1,7 +1,7 @@
 """Custody context.
 
 Owns: the accounts where groups' money is actually held (in the pilot, each
-group's own I&M Chama Account), the statement lines the custodian reports,
+group's own Chama Account at the custodian bank), the statement lines the custodian reports,
 how each line was accounted for, alerts, and reconciliation of WEPL's books
 against the custodian.
 

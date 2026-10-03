@@ -17,7 +17,7 @@ from contexts.ledger.public import member_balances
 from contexts.tenancy.contract import TenantScope
 from contexts.tenancy.infrastructure.session import database_tenant, role_bypasses_rls
 from contexts.tenancy.public import TenancyError, cross_tenant, current_tenant, provision_tenant, tenant
-from simulators.im_bank import bank
+from simulators.custodian_bank import bank
 from tests.scenario import SIGNATORY, Scenario
 
 OURS = {"audit", "tenancy", "identity", "communities", "governance", "ledger", "custody", "notifications", "simulator"}
@@ -192,3 +192,28 @@ class DatabaseShapeTests(TestCase):
         with_column = {t for (t,) in sql("SELECT table_name FROM information_schema.columns "
                                          "WHERE column_name = 'tenant_id' AND table_schema = 'public'")}
         self.assertEqual(with_column - scoped, set())
+
+
+class EveryTenantKeyIsReachableUnderRlsTests(TestCase):
+    """Row-level security adds "tenant = current OR cross-tenant" to every
+    query, and PostgreSQL cannot use that OR to enter an index that leads with
+    tenant_id. So a unique key on (tenant_id, x, ...) is looked up by x alone,
+    and x needs an index of its own, or each lookup scans every tenant's rows
+    (measured in ADR-0016: 254 ms for one idempotency key at platform scale)."""
+
+    def test_every_tenant_leading_unique_key_has_an_index_on_what_follows(self):
+        rows = sql("""
+            SELECT i.indrelid::regclass::text, i.indexrelid::regclass::text,
+                   (SELECT attname FROM pg_attribute WHERE attrelid = i.indrelid AND attnum = i.indkey[0]),
+                   (SELECT attname FROM pg_attribute WHERE attrelid = i.indrelid AND attnum = i.indkey[1])
+            FROM pg_index i
+            WHERE i.indisunique AND i.indnatts > 1""")
+        leading = {(table, first) for table, _, first, _ in rows}
+        leading |= set(sql("""
+            SELECT i.indrelid::regclass::text,
+                   (SELECT attname FROM pg_attribute WHERE attrelid = i.indrelid AND attnum = i.indkey[0])
+            FROM pg_index i"""))
+        missing = [f"{index} on {table}: nothing indexes {second} first"
+                   for table, index, first, second in rows
+                   if first == "tenant_id" and (table, second) not in leading]
+        self.assertEqual(missing, [])

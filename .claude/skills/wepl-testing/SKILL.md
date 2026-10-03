@@ -35,7 +35,7 @@ try.
 | Cross-context: properties, isolation, architecture | `backend/tests/` | varies |
 
 `backend/tests/scenario.py::Scenario` builds a group, members, a constitution
-and a simulated I&M account **through public surfaces only**. Use it rather than
+and a simulated custodian account **through public surfaces only**. Use it rather than
 creating rows by hand.
 
 **Tenant context in tests (ADR-0009).**
@@ -109,7 +109,7 @@ For money workflows, cover:
 - **wrong group** (`tests/test_isolation.py`);
 - provider failure (`notifications/tests/integration/test_outbox.py::Flaky`);
 - crash and reprocess (`custody/tests/integration/test_faults.py`);
-- faulty feed (`simulators.im_bank.connector.Faults`).
+- faulty feed (`simulators.custodian_bank.connector.Faults`).
 
 To prove a database rule, bypass the domain and write through the ORM or raw
 SQL. Otherwise you are testing the guard above it, not the rule.
@@ -127,7 +127,7 @@ SQL. Otherwise you are testing the guard above it, not the rule.
    - no signals;
    - no mutable money counters;
    - every ADR indexed.
-3. `migrate` and `demo_im_pilot` end to end.
+3. `migrate` and `demo_custody_pilot` end to end.
 
 There is no coverage gate, linter or type checker yet.
 
@@ -139,4 +139,4 @@ raising the line cap without an ADR.
 - No cross-process concurrency suite: two `post_journal` calls on one key from
   two connections; two workers racing `execute_mandate`; two relays claiming
   one outbox row.
-- No test against a real I&M statement format; the simulator stands in.
+- No test against a real custodian statement format; the simulator stands in.

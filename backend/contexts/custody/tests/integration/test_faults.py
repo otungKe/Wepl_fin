@@ -9,8 +9,8 @@ from contexts.custody.application.ingestion import account_for
 from contexts.custody.infrastructure.models import Alert, ExternalAccount, StatementLine
 from contexts.custody.public import ingest
 from contexts.ledger.infrastructure.models import JournalEntry
-from simulators.im_bank import bank
-from simulators.im_bank.connector import Faults, SimulatorConnector
+from simulators.custodian_bank import bank
+from simulators.custodian_bank.connector import Faults, SimulatorConnector
 from tests.scenario import Scenario
 
 N = "0012345678901"

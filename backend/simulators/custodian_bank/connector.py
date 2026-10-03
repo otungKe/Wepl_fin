@@ -21,7 +21,7 @@ def _line(t: SimTransaction) -> BankLine:
     return BankLine(external_id=t.txn_id, sequence=t.sequence, posted_at=t.posted_at, kind=LineKind(t.kind),
                     amount=Decimal(t.amount), narration=t.narration, reference=t.reference,
                     counterparty_name=t.counterparty_name, counterparty_msisdn=t.counterparty_msisdn,
-                    running_balance=Decimal(t.balance_after), metadata={"source": "im_simulator"})
+                    running_balance=Decimal(t.balance_after), metadata={"source": "bank_simulator"})
 
 
 class SimulatorConnector:

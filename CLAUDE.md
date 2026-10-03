@@ -16,5 +16,5 @@ the mandates that authorise payouts, and reconciliation against the custodian.
 - **Commands:** run everything from `backend/`:
   - `python manage.py test`
   - `python manage.py makemigrations --check --dry-run`
-  - `python manage.py demo_im_pilot`
+  - `python manage.py demo_custody_pilot`
 - **Database:** tests need PostgreSQL 16; never sqlite.

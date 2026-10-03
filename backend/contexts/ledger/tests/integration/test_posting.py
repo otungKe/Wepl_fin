@@ -25,7 +25,7 @@ class RealBooks:
         fund = open_fund(group.id, name="Main savings", actor="test")
         self.group_id, self.fund_id = group.id, fund.id
         self.member_id = add_member(group.id, msisdn="0700000005", name="Member", actor="test").id
-        ea = link_external_account(fund.id, institution="I&M Bank Kenya", account_number=f"L{fund.id}",
+        ea = link_external_account(fund.id, institution="Custodian Bank", account_number=f"L{fund.id}",
                                    account_name="Ledger tests", connector="upload", actor="test")
         self.cash = AccountKey(group.id, fund.id, AccountPurpose.CUSTODY_CASH, external_account_id=ea.id)
         self.member = AccountKey(group.id, fund.id, AccountPurpose.MEMBER_INTEREST, member_id=self.member_id)

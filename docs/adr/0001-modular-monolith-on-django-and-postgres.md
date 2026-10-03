@@ -6,7 +6,7 @@
 
 ## Context
 
-The pilot must show I&M Bank that the platform is stable now and in future
+The pilot must show the custodian bank that the platform is stable now and in future
 "beyond reasonable doubt" (CONFIRMED: Harry, 2026-09-28). The team is small.
 The first WEPL taught that Celery and Redis cost more than they gave, and that
 the ledger (Python `Decimal`, PostgreSQL triggers) was the best part

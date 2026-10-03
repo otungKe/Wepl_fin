@@ -95,7 +95,7 @@ class ProposalTests(TestCase):
         from django.utils import timezone
         from contexts.custody.infrastructure.models import StatementLine
         from contexts.custody.public import link_external_account
-        ea = link_external_account(self.fund.id, institution="I&M Bank Kenya", account_number=f"G{self.fund.id}",
+        ea = link_external_account(self.fund.id, institution="Custodian Bank", account_number=f"G{self.fund.id}",
                                    account_name="G", connector="upload", actor="t")
         return [StatementLine.objects.create(external_account_id=ea.id, external_id=f"t{i}", sequence=i,
                                              posted_at=timezone.now(), kind="withdrawal", amount=100).pk

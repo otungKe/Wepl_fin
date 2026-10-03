@@ -72,7 +72,7 @@ one member's account.
 
 ## Projected volumes
 
-These are assumptions, to be confirmed with I&M's pilot list:
+These are assumptions, to be confirmed with the custodian bank's pilot list:
 - **Pilot groups:** chamas of 10–50 members contributing monthly, at most
   weekly. That is roughly 300–6,000 lines per fund per year.
 - **Growth:** the largest group in view is about 200 members contributing
@@ -97,7 +97,7 @@ At those volumes the slowest read is under about 25 ms, and posting is about
 3. **The threshold is watched, not guessed.** The nightly integrity check
    (ledger 0006) records each fund's line count.
 4. **When any fund passes 100,000 lines,** or a production read of the
-   ledger exceeds 100 ms at the 95th percentile on I&M's hardware:
+   ledger exceeds 100 ms at the 95th percentile on the custodian bank's hardware:
    - re-run the benchmark there;
    - write the checkpoint ADR.
 

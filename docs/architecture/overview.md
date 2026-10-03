@@ -3,8 +3,8 @@
 **What it is.** WEPL keeps a trusted register of who owns what in a group's
 pooled money, and the approvals (mandates) that authorise every payout. Each
 day it proves that register against the account where the money is actually
-held. In the pilot WEPL never holds money: each group keeps it in its own
-I&M Chama Account (ADR-0006).
+held. In the pilot WEPL never holds money: each group keeps it in its own Chama
+Account at the custodian bank (ADR-0006).
 
 ## Contexts
 
@@ -77,7 +77,7 @@ context owns and does not own is in ADR-0002 and in each context's
   data is isolated by forced PostgreSQL row-level security, and application
   checks keep groups apart inside a tenant (ADR-0009, ADR-0005).
 
-## Evidence for I&M (custody design §8)
+## Evidence for the custodian bank (custody design §8)
 
 | Claim | Where it is shown |
 |---|---|
@@ -87,12 +87,12 @@ context owns and does not own is in ADR-0002 and in each context's
 | One group cannot touch another's money | `tests/test_isolation.py` |
 | Auditability | `custody.line_trail` goes from a bank transaction to its journal entries and mandate; `audit.history` gives every governance decision |
 | Architecture stays as designed | `tests/test_architecture.py` |
-| Demo | `python manage.py demo_im_pilot` |
+| Demo | `python manage.py demo_custody_pilot` |
 
 ## Not yet built
 
-- **Payouts through I&M's APIs** (Model C, a `payments` context).
-- **The real I&M statement format:** waiting on a sample export.
+- **Payouts through the custodian bank's APIs** (Model C, a `payments` context).
+- **The real custodian statement format:** waiting on a sample export.
 - **Contributions:** cycles, arrears and goals.
 - **Authentication, HTTP API and backoffice.**
 - **Institutions:** organizations with explicit, per-purpose, audited access

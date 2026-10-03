@@ -10,8 +10,8 @@ from hypothesis.extra.django import TestCase
 
 from contexts.custody.public import open_alerts, statement_lines
 from contexts.governance.infrastructure.models import Mandate
-from simulators.im_bank import bank
-from simulators.im_bank.connector import Faults, SimulatorConnector
+from simulators.custodian_bank import bank
+from simulators.custodian_bank.connector import Faults, SimulatorConnector
 from tests.scenario import Scenario
 
 N = "0012345678901"

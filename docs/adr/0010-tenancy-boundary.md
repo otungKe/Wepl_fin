@@ -34,7 +34,7 @@ An organization may have relationships with many tenants.
 Example:
 
 ```text
-I&M Bank
+Bank Y
  ├── Group A → Tenant A
  ├── Group B → Tenant B
  └── Group C → Tenant C
