@@ -83,8 +83,15 @@ code for it:
   - A sub-account takes no opening balance.
   - Only one sub-account per group per pool.
   - Interest and charges on the pool are held: who bears them is undecided.
-- **Not built yet:** the inbound endpoints (`check_reference` and `receive`
-  are their back ends), routing a held transaction by hand, and payouts.
+- **Inbound endpoints (`api/`):**
+  - `POST /collections/validate` and `POST /collections/notify`.
+  - They are off unless `WEPL_COLLECTIONS_ACCOUNT` and
+    `WEPL_COLLECTIONS_SECRET` are set.
+  - Every request needs an HMAC-SHA256 signature over `timestamp.body`
+    (`X-WEPL-Timestamp`, `X-WEPL-Signature`), within 5 minutes.
+  - The JSON format in `api/payload.py` is a placeholder until the bank
+    sit-down. Keep the bank's format out of everything past that module.
+- **Not built yet:** routing a held transaction by hand, and payouts.
 
 ## Rules to preserve
 
