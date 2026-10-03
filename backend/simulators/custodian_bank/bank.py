@@ -31,7 +31,7 @@ def _post(number, kind, amount, *, inflow: bool, **fields) -> SimTransaction:
         raise InsufficientFunds(f"{number} has {acct.balance}, cannot pay {amount}.")
     acct.balance += amount if inflow else -amount
     txn = SimTransaction.objects.create(
-        account=acct, txn_id="IM" + secrets.token_hex(6).upper(), sequence=acct.next_sequence,
+        account=acct, txn_id="TX" + secrets.token_hex(6).upper(), sequence=acct.next_sequence,
         posted_at=timezone.now(), kind=kind, amount=amount, balance_after=acct.balance, **fields)
     acct.next_sequence += 1
     acct.save(update_fields=["balance", "next_sequence"])

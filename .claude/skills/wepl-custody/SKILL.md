@@ -56,6 +56,36 @@ the questions still open with the bank.
 "Balanced" means the books equal the bank. An unmatched outflow still
 reconciles; the alert is the control, not the reconciliation.
 
+## The pooled collection account (ADR-0018, Proposed)
+
+Harry chose one WEPL collection account for every group (2026-10-03). The
+code for it:
+
+- **`application/collections.py` and `infrastructure/pooled.py`.**
+  - A `CollectionAccount` is platform data. Its tables have forced row-level
+    security that admits only `cross_tenant()` (`platform_only`, custody
+    0007).
+  - Each fund collecting through it has an `ExternalAccount` sub-account
+    (`pooled_in`), created by `collect_into`.
+- **`receive`, phase 1, in a cross-tenant operation.** Each bank transaction
+  becomes one append-only `Collection`, then a `CollectionRouting`:
+  - a pay-in is routed by the payment reference `<group payment code>-<member
+    code>`;
+  - a payout is routed by the one mandate reference it quotes;
+  - anything else is `held`, with a `PoolAlert`. Never guess a group.
+- **`receive`, phase 2, inside each group's tenant.** The routed line goes to
+  the ordinary `ingest`, with the sub-account's own sequence and running
+  balance. A crash between the phases heals on the next resend.
+- **`reconcile_pool`:** the bank's balance = Σ sub-account `custody_cash` +
+  the net of held transactions, plus gaps and the running-balance chain on
+  the bank's numbering.
+- **Rules:**
+  - A sub-account takes no opening balance.
+  - Only one sub-account per group per pool.
+  - Interest and charges on the pool are held: who bears them is undecided.
+- **Not built yet:** the inbound endpoints (`check_reference` and `receive`
+  are their back ends), routing a held transaction by hand, and payouts.
+
 ## Rules to preserve
 
 - **Ambiguity is never a match.** A wrong match hides an alert, which is worse

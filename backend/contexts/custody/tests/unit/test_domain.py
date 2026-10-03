@@ -6,6 +6,7 @@ from django.test import SimpleTestCase
 from contexts.custody.domain import accounting
 from contexts.custody.domain.accounting import AccountingError, FundBook
 from contexts.custody.domain.attribution import MemberFacts, attribute
+from contexts.custody.domain.collections import RouteKind, parse_reference, route
 from contexts.custody.domain.matching import match_outflow, quoted_references
 from contexts.custody.domain.reconciliation import assess, balance_breaks
 from contexts.custody.domain.resolution import InvalidCorrection, Outcome, ensure_correction
@@ -144,3 +145,25 @@ class ReconciliationAndCorrectionTests(SimpleTestCase):
                              (None, Outcome.ATTRIBUTED)):
             with self.assertRaises(InvalidCorrection):
                 ensure_correction(current, new)
+
+
+class PooledRoutingTests(SimpleTestCase):
+    def test_a_reference_reads_the_same_however_it_is_typed(self):
+        for typed in ("K7QAP-M01", "k7qap m01", "K7QAPM01", " k7-qap/m01 "):
+            with self.subTest(typed):
+                ref = parse_reference(typed)
+                self.assertEqual((ref.group_code, ref.member_code), ("K7QAP", "M01"))
+        for wrong in ("", "K7QAP", "K7QAP-X01", "K7Q-M01", "chama contribution"):
+            with self.subTest(wrong):
+                self.assertIsNone(parse_reference(wrong))
+
+    def test_only_what_a_transaction_quotes_routes_it(self):
+        self.assertEqual(route(kind="deposit", reference="K7QAP-M01", quoted_mandates=()).kind,
+                         RouteKind.BY_PAYMENT_CODE)
+        self.assertEqual(route(kind="deposit", reference="contribution", quoted_mandates=()).kind, RouteKind.HOLD)
+        self.assertEqual(route(kind="withdrawal", reference="", quoted_mandates=("WMABCDEF",)).key, "WMABCDEF")
+        self.assertEqual(route(kind="withdrawal", reference="", quoted_mandates=()).kind, RouteKind.HOLD)
+        self.assertEqual(route(kind="withdrawal", reference="", quoted_mandates=("WMABCDEF", "WMBCDEFG")).kind,
+                         RouteKind.HOLD)
+        for kind in ("interest", "charge"):
+            self.assertEqual(route(kind=kind, reference="K7QAP-M01", quoted_mandates=()).kind, RouteKind.HOLD)

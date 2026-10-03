@@ -26,6 +26,9 @@ def record_opening_balances(ea_id: int, *, statement_balance, member_balances: d
     actor = maker.msisdn
     with operation("custody.opening_balances", actor=actor):
         balance = Money.of(statement_balance, ea.currency)
+        if ea.pooled_in_id is not None:
+            raise CustodyError("A sub-account of the collection account starts empty: money arrives through the "
+                               "account itself, so the bank's balance and the groups' books stay equal (ADR-0018).")
         if ea.lines.exists():
             raise CustodyError("Opening balances must be recorded before any other statement line.")
         signed_off = {}

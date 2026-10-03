@@ -33,6 +33,11 @@ class ExternalAccount(models.Model):
     connector = models.CharField(max_length=40)
     currency = models.CharField(max_length=3, default="KES")
     linked_at = models.DateTimeField(auto_now_add=True)
+    # Set when this is a fund's sub-account of WEPL's pooled collection
+    # account (ADR-0018). Read only as an id: the pooled account is platform
+    # data, invisible inside a tenant.
+    pooled_in = models.ForeignKey("CollectionAccount", null=True, blank=True, on_delete=models.PROTECT,
+                                  related_name="+")
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=["institution", "account_number"], name="custody_account_unique")]
@@ -131,3 +136,7 @@ class ReconciliationRun(models.Model):
     open_alerts = models.PositiveIntegerField()
     balanced = models.BooleanField()
     operation_id = models.CharField(max_length=64, blank=True, default="")
+
+
+from .pooled import (Collection, CollectionAccount, CollectionRouting, PoolAlert,  # noqa: E402,F401
+                     PoolReconciliationRun)
