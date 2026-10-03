@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from decimal import Decimal
 
 from django.test import SimpleTestCase
 
@@ -6,7 +7,7 @@ from contexts.custody.domain import accounting
 from contexts.custody.domain.accounting import AccountingError, FundBook
 from contexts.custody.domain.attribution import MemberFacts, attribute
 from contexts.custody.domain.matching import match_outflow, quoted_references
-from contexts.custody.domain.reconciliation import assess
+from contexts.custody.domain.reconciliation import assess, balance_breaks
 from contexts.custody.domain.resolution import InvalidCorrection, Outcome, ensure_correction
 from contexts.governance.contract import Allocation, MandateStatus, MandateView, SharingRule
 from contexts.ledger.contract import AccountPurpose, Side
@@ -119,6 +120,22 @@ class ReconciliationAndCorrectionTests(SimpleTestCase):
         diff = assess(statement_balance=Money("10"), ledger_cash=Money("7"), sequences=[1], unresolved=0)
         self.assertEqual(diff.difference, Money("-3"))
         self.assertFalse(assess(statement_balance=None, ledger_cash=Money("0"), sequences=[1], unresolved=1).balanced)
+        broken = assess(statement_balance=Money("10"), ledger_cash=Money("10"), sequences=[1, 2], unresolved=0,
+                        breaks=(2,))
+        self.assertFalse(broken.balanced)
+
+    def test_running_balance_chain(self):
+        D = Decimal
+        chain = [(0, "opening", D("100"), D("100")), (1, "deposit", D("50"), D("150")),
+                 (2, "withdrawal", D("30"), D("120")), (3, "charge", D("5"), D("115")),
+                 (4, "interest", D("1"), D("116"))]
+        self.assertEqual(balance_breaks(chain), ())
+        without_line_2 = [chain[0], chain[1], chain[3], chain[4]]
+        self.assertEqual(balance_breaks(without_line_2), (3,))  # reported once, where it shows
+        unknown = [chain[0], (1, "deposit", D("50"), None), chain[2]]
+        self.assertEqual(balance_breaks(unknown), ())  # carried to the next printed balance
+        self.assertEqual(balance_breaks([(1, "deposit", D("50"), D("80"))]), (1,))  # an account starts at zero
+        self.assertEqual(balance_breaks([]), ())
 
     def test_only_listed_corrections_are_allowed(self):
         ensure_correction(Outcome.UNATTRIBUTED, Outcome.ATTRIBUTED)
