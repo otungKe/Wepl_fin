@@ -1,6 +1,7 @@
 from django.db import transaction
 
 from contexts.audit.public import record
+from contexts.communities.public import CommunityError, fund_view
 
 from ..domain.rules import REQUIRED_CHOICES, ConstitutionRules, RulesError
 from ..infrastructure.models import Constitution
@@ -14,6 +15,13 @@ def adopt_constitution(group_id: int, rules: dict, *, actor: str) -> int:
     if missing := parsed.missing_choices():  # no defaults: the group chooses (ADR-0014, ADR-0023)
         raise RulesError("The constitution must state the group's own choice for "
                          + "; ".join(f"{n} (one of {[v.value for v in REQUIRED_CHOICES[n]]})" for n in missing) + ".")
+    for rule in parsed.contributions:  # ADR-0022: only the group's own open funds
+        try:
+            fund = fund_view(rule.fund_id)
+        except CommunityError:
+            fund = None
+        if fund is None or fund.group_id != group_id or not fund.is_open:
+            raise RulesError(f"Fund {rule.fund_id} is not an open fund of this group; it cannot have a contribution rule.")
     latest = Constitution.objects.select_for_update().filter(group_id=group_id).order_by("-version").first()
     version = latest.version + 1 if latest else 1
     c = Constitution.objects.create(group_id=group_id, version=version, rules=parsed.to_dict(), adopted_by=actor)
@@ -38,3 +46,10 @@ def rules_in_force(group_id: int, at) -> tuple[int, ConstitutionRules] | None:
     qs = Constitution.objects.filter(group_id=group_id)
     c = qs.filter(effective_from__lte=at).order_by("-version").first() or qs.order_by("version").first()
     return (c.version, ConstitutionRules.parse(c.rules)) if c else None
+
+
+def rules_history(group_id: int) -> list[tuple]:
+    """Every version as (effective_from, rules), oldest first. The first
+    version also covers anything dated before it (as ``rules_in_force``)."""
+    return [(c.effective_from, ConstitutionRules.parse(c.rules))
+            for c in Constitution.objects.filter(group_id=group_id).order_by("version")]

@@ -1,8 +1,10 @@
 # ADR-0022: Contributions and arrears, as each group decides
 
-- **Status:** **Proposed** (2026-10-04). Not built. Harry's direction
+- **Status:** **Proposed; first part built** (2026-10-04). Harry's direction
   (2026-10-04): "All those should be a group decision". Every rule below is
-  a setting the group fills in; WEPL picks none of them.
+  a setting the group fills in; WEPL picks none of them. Harry said "Merge
+  and next" without answering the four open questions; the thread built on
+  the answers under "Open questions, as built" (not yet confirmed by Harry).
 - **Builds on:** ADR-0014 (leavers), ADR-0015 (funds), the constitution
   template §3 (each fund has a name, a purpose and a contribution rule).
 
@@ -35,6 +37,7 @@
    | `due_day` | weekday (1–7) for weekly, day of month (1–28) for monthly |
    | `starts_on` | the first period's date |
    | `payment_order` | `oldest_first` (a payment clears the oldest amount owed first) or `current_first` |
+   | `extra_payments` | `pay_ahead` (paying more covers later periods) or `savings` (it does not) |
    | `joiners_owe_from` | `joining` (from the next due date after joining) or `start` (back to `starts_on`) |
    | `late_fine` | `none`, a fixed amount, or a percentage of the overdue amount, with `grace_days` |
    | `leaver_arrears` | `written_off` or `deducted_from_payout` |
@@ -51,14 +54,42 @@
    arrears. It reads memberships (communities), the rule (governance) and
    pay-ins (ledger) through their public surfaces, and posts nothing.
 
-## Open (UNKNOWN), for Harry
+## Open questions, as built (Claude's answers; Harry has not confirmed)
 
-- Should a rule be per fund (as the template §3 suggests) or one for the
-  whole group?
-- Is a fine booked as group income, or held for a purpose the group names?
-- Who may waive arrears or a fine for one member, and how is that approved?
-- Does a member's pay-in that exceeds what is due count as paid in advance
-  for future periods, or only as savings?
+1. **Per fund or whole group?** Per fund, as the template §3 has it.
+2. **Paying more than is due?** A group choice, `extra_payments`.
+3. **Where a paid fine goes?** Not decided. Fines are worked out and shown
+   as owed; nothing is booked or taken for them.
+4. **Waivers?** Not built. Proposed: approved like a payout, under the
+   group's own approval rules.
+
+## How it works (built)
+
+- `governance/domain/contribution.py` parses each rule;
+  `adopt_constitution` refuses a rule for a fund that is not one of the
+  group's open funds, and a second rule for the same fund. Every setting
+  is required.
+- `contexts/contributions` (stores nothing, posts nothing):
+  - `domain/schedule.py`: due dates (weekly by weekday, monthly by day
+    1–28). Each due date takes the rule in the constitution version in
+    force that day; the first version also covers earlier dates, so a group
+    onboarding with an existing rule can be owed back to `starts_on`.
+  - `domain/standing.py`: a payment counts for every period that has begun
+    (the period up to a due date begins the day after the previous one), so
+    paying a few days early is on time. It clears periods in the group's
+    `payment_order`; anything left is paid ahead or savings, as chosen. A
+    period still owing when its grace days run out is fined once: the fixed
+    amount, or the percentage of what was then owed. A leaver owes nothing
+    after the day they left; `written_off` shows their arrears and fines as
+    written off.
+  - `member_standing`, `fund_standing` (public), and the command
+    `contribution_standing --tenant T --fund F`.
+- Pay-ins are the member's attributed pay-ins in that fund, dated by the
+  bank (`custody.member_pay_ins`); opening balances are not pay-ins. All of
+  a member's pay-ins into a fund count towards its rule: there are no
+  other kinds of pay-in yet.
+- The payment order, extra-payment, fine and leaver settings used are those
+  in force on the day asked about.
 
 ## Alternatives
 
