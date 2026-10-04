@@ -57,24 +57,6 @@ def tenant_scoped(table: str, *, system_rows: bool = False) -> tuple[str, str]:
     return forward, reverse
 
 
-def platform_only(table: str) -> tuple[str, str]:
-    """(forward, reverse) SQL for the platform's own records that concern many
-    tenants at once, such as the pooled collection account (ADR-0018): forced
-    row-level security whose only way in is a declared cross-tenant
-    operation. Code acting for one tenant sees none of it."""
-    forward = f"""
-    ALTER TABLE {table} ENABLE ROW LEVEL SECURITY;
-    ALTER TABLE {table} FORCE ROW LEVEL SECURITY;
-    CREATE POLICY {table}_platform_only ON {table} USING (wepl_cross_tenant()) WITH CHECK (wepl_cross_tenant());
-    """
-    reverse = f"""
-    DROP POLICY IF EXISTS {table}_platform_only ON {table};
-    ALTER TABLE {table} NO FORCE ROW LEVEL SECURITY;
-    ALTER TABLE {table} DISABLE ROW LEVEL SECURITY;
-    """
-    return forward, reverse
-
-
 # ADR-0017: a row and every row it refers to belong to the same tenant.
 # Foreign key checks ignore row-level security, so the tenant must be part of
 # the key itself.

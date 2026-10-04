@@ -44,8 +44,6 @@ class Scenario:
                 for c in capabilities:
                     grant(self.m[-1].id, c, actor="test")
             self.account = account
-            if account is None:  # it will collect through a pooled account (ADR-0018)
-                return
             bank.open_account(account, name, opening_balance)
             self.ea = link_external_account(self.fund.id, institution="Custodian Bank", account_number=account,
                                             account_name=name, connector="bank_simulator", actor="test")

@@ -187,18 +187,6 @@ class DatabaseShapeTests(TestCase):
                 problems.append(f"{table}: tenant_id missing or nullable")
         self.assertEqual(problems, [])
 
-    def test_platform_data_about_many_tenants_is_visible_only_cross_tenant(self):
-        """ADR-0018: the pooled collection account's tables. Inside a tenant
-        nothing of them is visible; the policy admits only a declared
-        cross-tenant operation."""
-        pooled = [m._meta.db_table for m in apps.get_models()
-                  if m._meta.app_label == "custody" and m.tenant_scope == TenantScope.SYSTEM]
-        self.assertGreaterEqual(len(pooled), 5)
-        problems = [t for t in pooled if sql(
-            "SELECT relrowsecurity AND relforcerowsecurity FROM pg_class WHERE relname = %s", [t])[0] != (True,)
-            or sql("SELECT qual FROM pg_policies WHERE tablename = %s", [t]) != [("wepl_cross_tenant()",)]]
-        self.assertEqual(problems, [])
-
     def test_no_other_table_has_a_tenant_column_without_rls(self):
         scoped = set(tenant_scoped_tables())
         with_column = {t for (t,) in sql("SELECT table_name FROM information_schema.columns "

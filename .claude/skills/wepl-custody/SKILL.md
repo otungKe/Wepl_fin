@@ -56,45 +56,6 @@ the questions still open with the bank.
 "Balanced" means the books equal the bank. An unmatched outflow still
 reconciles; the alert is the control, not the reconciliation.
 
-## The pooled collection account (ADR-0018, Proposed)
-
-Harry chose one WEPL collection account for every group (2026-10-03). The
-code for it:
-
-- **`application/collections.py` and `infrastructure/pooled.py`.**
-  - A `CollectionAccount` is platform data. Its tables have forced row-level
-    security that admits only `cross_tenant()` (`platform_only`, custody
-    0007).
-  - Each fund collecting through it has an `ExternalAccount` sub-account
-    (`pooled_in`), created by `collect_into`.
-- **`receive`, phase 1, in a cross-tenant operation.** Each bank transaction
-  becomes one append-only `Collection`, then a `CollectionRouting`:
-  - a pay-in is routed by the payment reference `<7-digit group code> <member's
-    mobile>` (`1234566 0712597024`; the last code digit is a Damm check digit,
-    `shared_kernel/check_digit.py`, so a typo names no group), and only when that number is a current
-    member of that group;
-  - a payout is routed by the one mandate reference it quotes;
-  - anything else is `held`, with a `PoolAlert`. Never guess a group.
-- **`receive`, phase 2, inside each group's tenant.** The routed line goes to
-  the ordinary `ingest`, with the sub-account's own sequence and running
-  balance. A crash between the phases heals on the next resend.
-- **`reconcile_pool`:** the bank's balance = Σ sub-account `custody_cash` +
-  the net of held transactions, plus gaps and the running-balance chain on
-  the bank's numbering.
-- **Rules:**
-  - A sub-account takes no opening balance.
-  - Only one sub-account per group per pool.
-  - Interest and charges on the pool are held: who bears them is undecided.
-- **Inbound endpoints (`api/`):**
-  - `POST /collections/validate` and `POST /collections/notify`.
-  - They are off unless `WEPL_COLLECTIONS_ACCOUNT` and
-    `WEPL_COLLECTIONS_SECRET` are set.
-  - Every request needs an HMAC-SHA256 signature over `timestamp.body`
-    (`X-WEPL-Timestamp`, `X-WEPL-Signature`), within 5 minutes.
-  - The JSON format in `api/payload.py` is a placeholder until the bank
-    sit-down. Keep the bank's format out of everything past that module.
-- **Not built yet:** routing a held transaction by hand, and payouts.
-
 ## Rules to preserve
 
 - **Ambiguity is never a match.** A wrong match hides an alert, which is worse
@@ -141,3 +102,10 @@ code for it:
 - `contexts/custody/tests/integration/test_faults.py`
 - `tests/test_isolation.py`
 - `tests/test_properties.py`
+
+## The pooled collection account (withdrawn)
+
+One WEPL collection account for every group was designed and built (ADR-0018),
+then withdrawn on 2026-10-04: each group keeps its own account (ADR-0006).
+The code is kept as a fallback in commit `79cb91f`. Don't rebuild or restore
+it without Harry's word.

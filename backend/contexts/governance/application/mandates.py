@@ -26,13 +26,6 @@ def find_by_reference(fund_id: int, references) -> MandateView | None:
     return _view(m) if m else None
 
 
-def mandates_by_reference(references) -> list[MandateView]:
-    """Mandates quoting any of ``references``, in any fund the caller can
-    see. References are unique across WEPL, so in a declared cross-tenant
-    operation this finds the one group a pooled payout belongs to (ADR-0018)."""
-    return [_view(m) for m in Mandate.objects.filter(reference__in=list(references)).order_by("id")]
-
-
 def issued_for_amount(fund_id: int, amount: Money) -> list[MandateView]:
     return [_view(m) for m in Mandate.objects.filter(fund_id=fund_id, status=MandateStatus.ISSUED,
                                                      amount=amount.amount, currency=amount.currency).order_by("id")]
