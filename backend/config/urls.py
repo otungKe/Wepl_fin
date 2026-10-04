@@ -8,5 +8,5 @@ def health(_request):
 
 urlpatterns = [
     path("health/", health),
-    path("collections/", include("contexts.custody.api.urls")),  # ADR-0018
+    path("collections/", include("contexts.custody.api.urls")),  # ADR-0019
 ]

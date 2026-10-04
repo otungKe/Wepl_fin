@@ -27,10 +27,8 @@ def all_accounts() -> list[ExternalAccountView]:
 
 @transaction.atomic
 def link_external_account(fund_id: int, *, institution: str, account_number: str, account_name: str,
-                          connector: str, actor: str, pooled_in: int | None = None) -> ExternalAccountView:
-    """Record where a fund's money is held. One custodian account backs one
-    fund. ``pooled_in`` makes it a sub-account of WEPL's pooled collection
-    account (ADR-0018; use ``collect_into``)."""
+                          connector: str, actor: str) -> ExternalAccountView:
+    """Record where a fund's money is held. One custodian account backs one fund."""
     fund = fund_view(fund_id)
     if not fund.is_open:
         raise CustodyError(f"{fund.name} is closed.")
@@ -39,7 +37,7 @@ def link_external_account(fund_id: int, *, institution: str, account_number: str
     try:
         ea = ExternalAccount.objects.create(group_id=fund.group_id, fund_id=fund.id, institution=institution,
                                             account_number=account_number, account_name=account_name,
-                                            connector=connector, currency=fund.currency, pooled_in_id=pooled_in)
+                                            connector=connector, currency=fund.currency)
     except IntegrityError as exc:  # the fund closed after it was read (custody 0004, ADR-0015)
         if getattr(getattr(exc.__cause__, "diag", None), "sqlstate", None) == "23001":
             raise CustodyError(f"{fund.name} is closed.") from None

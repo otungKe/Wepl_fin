@@ -82,9 +82,8 @@ WEPL_CONNECTORS = {}
 if WEPL_ENABLE_SIMULATOR:
     WEPL_CONNECTORS["bank_simulator"] = "simulators.custodian_bank.connector.SimulatorConnector"
 
-# WEPL's pooled collection account and the bank's calls into it (ADR-0018).
-# The endpoints are off unless both are set. The secret signs every request.
-WEPL_COLLECTIONS_ACCOUNT = os.environ.get("WEPL_COLLECTIONS_ACCOUNT", "")
+# The bank's collections service on each group's own account (ADR-0019). Its
+# endpoints are off unless the secret is set; the secret signs every request.
 WEPL_COLLECTIONS_SECRET = os.environ.get("WEPL_COLLECTIONS_SECRET", "")
 if WEPL_COLLECTIONS_SECRET and len(WEPL_COLLECTIONS_SECRET) < 32:
     raise RuntimeError("WEPL_COLLECTIONS_SECRET must be at least 32 characters.")

@@ -1,11 +1,18 @@
 # ADR-0018: One WEPL collection account at the custodian bank
 
-- **Status:** Proposed (2026-10-03).
-  - The *choice* is Harry's: one WEPL collection account rather than one per
-    group, made on 2026-10-03.
-  - The *details* wait on the sit-down with the bank's developers.
-  - Accepted only on Harry's word.
-- **Supersedes, in part:**
+- **Status:** Withdrawn, kept as a fallback (Harry, 2026-10-04).
+  - Harry chose the pooled account on 2026-10-03, then on 2026-10-04 returned
+    to one account per group (ADR-0006), each able to use the bank's
+    collections service (ADR-0019).
+  - The pooled design stays here, and its code stays in git history, in case
+    per-group accounts with the bank do not work out.
+  - **The full implementation is commit `79cb91f`** (the merge of PR #5) on
+    `main`; it was removed by the revert that follows it.
+  - **To restore it:** revert that revert, then bring the migrations up to
+    date (communities 0014 and custody 0007 were removed with it).
+  - Taking it up again needs Harry's word and a fresh look at everything
+    below marked open.
+- **Would have superseded, in part:**
   - ADR-0006, Model A ("WEPL never holds money");
   - ADR-0006's open question about the statement format.
 - **Touches:**

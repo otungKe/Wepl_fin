@@ -10,19 +10,7 @@ def group_view(group_id: int) -> GroupView:
     g = Group.objects.filter(pk=group_id).first()
     if g is None:
         raise CommunityError(f"Unknown group {group_id}.")
-    return _group(g)
-
-
-def _group(g: Group) -> GroupView:
-    return GroupView(id=g.pk, tenant_id=g.tenant_id, name=g.name, payment_code=g.payment_code)
-
-
-def group_for_payment_code(code: str) -> GroupView | None:
-    """The group whose payment code this is, or None. Only finds groups the
-    caller can see: its own inside a tenant, any in a declared cross-tenant
-    operation (ADR-0018 routing)."""
-    g = Group.objects.filter(payment_code=code.strip()).first()
-    return _group(g) if g else None
+    return GroupView(id=g.pk, tenant_id=g.tenant_id, name=g.name)
 
 
 def fund_view(fund_id: int) -> FundView:

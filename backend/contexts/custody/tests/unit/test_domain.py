@@ -6,7 +6,6 @@ from django.test import SimpleTestCase
 from contexts.custody.domain import accounting
 from contexts.custody.domain.accounting import AccountingError, FundBook
 from contexts.custody.domain.attribution import MemberFacts, attribute
-from contexts.custody.domain.collections import RouteKind, parse_reference, route
 from contexts.custody.domain.matching import match_outflow, quoted_references
 from contexts.custody.domain.reconciliation import assess, balance_breaks
 from contexts.custody.domain.resolution import InvalidCorrection, Outcome, ensure_correction
@@ -35,6 +34,16 @@ class AttributionTests(SimpleTestCase):
     def test_remembered_payer_then_own_number(self):
         self.assertEqual(self.attr(payer_msisdn="0733000000", remembered_payers={"254733000000": 1}), 1)
         self.assertEqual(self.attr(payer_msisdn="+254712000002"), 2)
+
+    def test_a_mobile_number_quoted_as_the_reference_names_the_member(self):
+        """Someone may pay for a member by typing that member's number (ADR-0019)."""
+        for typed in ("0712000002", "0712 000 002", "+254712000002", "#254712000002"):
+            with self.subTest(typed):
+                self.assertEqual(self.attr(reference=typed, payer_msisdn="0712000001"), 2)
+        self.assertIsNone(self.attr(reference="0799999999", payer_msisdn="0712000001"))  # said who; held
+        self.assertEqual(self.attr(reference="school fees 0712000002", payer_msisdn="0712000001"), 1)  # free text
+        ended = [MemberFacts(2, "M02", "254712000002", active=False)]
+        self.assertIsNone(self.attr(members=ended, reference="0712000002"))
 
     def test_an_ended_spells_code_always_means_that_spell(self):
         """John was M01, left, and is M03 now. A payment quoting M01 is held for
@@ -145,36 +154,3 @@ class ReconciliationAndCorrectionTests(SimpleTestCase):
                              (None, Outcome.ATTRIBUTED)):
             with self.assertRaises(InvalidCorrection):
                 ensure_correction(current, new)
-
-
-class PooledRoutingTests(SimpleTestCase):
-    def test_a_reference_reads_the_same_however_it_is_typed(self):
-        for typed in ("1234566 0712597024", "1234566#0712 597 024", "12345660712597024", "1234566#254712597024",
-                      "1234566-+254712597024", "1234566 712597024"):
-            with self.subTest(typed):
-                ref = parse_reference(typed)
-                self.assertEqual((ref.group_code, ref.msisdn), ("1234566", "254712597024"))
-                self.assertEqual(str(ref), "1234566 0712597024")
-        for wrong in ("", "1234566", "1234566 0812597024", "123456 0712597024", "1234566 07125970",
-                      "chama contribution"):
-            with self.subTest(wrong):
-                self.assertIsNone(parse_reference(wrong))
-
-    def test_a_mistyped_code_names_no_group(self):
-        code = "1234566"
-        typos = {code[:i] + d + code[i + 1:] for i in range(7) for d in "0123456789"} - {code}
-        swaps = {code[:i] + code[i + 1] + code[i] + code[i + 2:] for i in range(6)} - {code}
-        for typed in typos | swaps:
-            with self.subTest(typed):
-                self.assertIsNone(parse_reference(f"{typed} 0712597024"))
-
-    def test_only_what_a_transaction_quotes_routes_it(self):
-        self.assertEqual(route(kind="deposit", reference="1234566 0712597024", quoted_mandates=()).kind,
-                         RouteKind.BY_PAYMENT_CODE)
-        self.assertEqual(route(kind="deposit", reference="contribution", quoted_mandates=()).kind, RouteKind.HOLD)
-        self.assertEqual(route(kind="withdrawal", reference="", quoted_mandates=("WMABCDEF",)).key, "WMABCDEF")
-        self.assertEqual(route(kind="withdrawal", reference="", quoted_mandates=()).kind, RouteKind.HOLD)
-        self.assertEqual(route(kind="withdrawal", reference="", quoted_mandates=("WMABCDEF", "WMBCDEFG")).kind,
-                         RouteKind.HOLD)
-        for kind in ("interest", "charge"):
-            self.assertEqual(route(kind=kind, reference="1234566 0712597024", quoted_mandates=()).kind, RouteKind.HOLD)

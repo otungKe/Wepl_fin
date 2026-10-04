@@ -1,6 +1,7 @@
 """WEPL's placeholder request format for the bank's collections service,
-until the real one is agreed (ADR-0018). A bank adapter will map the bank's
-own format onto these same fields; nothing past this module sees either."""
+until the real one is agreed at the sit-down with the bank's developers
+(ADR-0019). A bank adapter will map the bank's own format onto these same
+fields; nothing past this module sees either."""
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 
@@ -9,6 +10,13 @@ from ..domain.statement import BankLine, LineKind
 
 class BadPayload(ValueError):
     pass
+
+
+def account_number(data: dict) -> str:
+    number = str(data.get("account_number", "")).strip()
+    if not number:
+        raise BadPayload("Name the account the payment is for.")
+    return number
 
 
 def bank_line(data: dict) -> BankLine:

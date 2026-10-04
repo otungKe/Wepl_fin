@@ -1,5 +1,5 @@
 """Use case: found a group. The group is a tenant (ADR-0010, ADR-0013)."""
-from django.db import IntegrityError, transaction
+from django.db import transaction
 
 from contexts.audit.public import record
 from contexts.tenancy.public import current_tenant, provision_tenant, tenant
@@ -23,20 +23,7 @@ def create_group(name: str, *, actor: str) -> GroupView:
         raise CommunityError("A group is founded outside any tenant, because it becomes one.")
     identity = provision_tenant(name, actor=actor)
     with tenant(identity.id):
-        group = _found(name)
+        group = Group.objects.create(name=name)
         record(actor, "group.created", target_type="group", target_id=group.pk, group_id=group.pk,
                data={"tenant_id": identity.id})
         return group_view(group.pk)
-
-
-def _found(name: str) -> Group:
-    """The database draws the payment code from 900,000. A clash with an
-    existing group is refused by its unique key; draw again."""
-    for attempt in range(20):
-        try:
-            with transaction.atomic():
-                return Group.objects.create(name=name)
-        except IntegrityError as exc:
-            if "payment_code" not in str(exc) or attempt == 19:
-                raise
-    raise AssertionError("unreachable")

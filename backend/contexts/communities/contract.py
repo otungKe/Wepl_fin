@@ -15,7 +15,6 @@ class GroupView:
     id: int
     tenant_id: int  # the group's own tenant identity: the group is the tenant (ADR-0010)
     name: str
-    payment_code: str = ""  # quoted before the member code on pooled collections (ADR-0018)
 
 
 @dataclass(frozen=True)

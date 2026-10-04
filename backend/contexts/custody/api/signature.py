@@ -1,5 +1,5 @@
 """Is a request from the bank? An HMAC-SHA256 signature over the timestamp
-and the body, with a shared secret (ADR-0018, item 7).
+and the body, with a shared secret (ADR-0019).
 
 ASSUMPTION: the bank can sign requests. The mechanism (signature, mutual TLS
 or an IP allowlist) is to be agreed at the sit-down with its developers; this
