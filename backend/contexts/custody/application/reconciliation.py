@@ -18,7 +18,8 @@ def _view(r: ReconciliationRun) -> ReconciliationView:
         id=r.pk, statement_balance=r.statement_balance, ledger_cash=r.ledger_cash, difference=r.difference,
         member_interests=r.member_interests, unattributed=r.unattributed, unexplained_out=r.unexplained_out,
         retained=r.retained, lines_seen=r.lines_seen, lines_unresolved=r.lines_unresolved,
-        sequence_gaps=r.sequence_gaps, balance_breaks=r.balance_breaks, open_alerts=r.open_alerts, balanced=r.balanced)
+        sequence_gaps=r.sequence_gaps, balance_breaks=r.balance_breaks, open_alerts=r.open_alerts, balanced=r.balanced,
+        run_at=r.run_at)
 
 
 @transaction.atomic  # the account lock gives a consistent snapshot of lines and books

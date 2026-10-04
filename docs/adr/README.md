@@ -21,6 +21,7 @@
 | [0017](0017-linked-rows-keep-their-tenant.md) | A row and every row it refers to share a tenant: composite foreign keys, plus checks for plain ids installed by the dependent context | **Accepted** (Harry); implemented |
 | [0018](0018-pooled-collection-account.md) | One WEPL collection account, each fund a sub-ledger, routed by payment reference | Withdrawn (Harry, 2026-10-04): kept as a fallback; code in commit `79cb91f` |
 | [0019](0019-collections-service-on-each-group-account.md) | The bank's collections service on each group's own account: the reference check and notifications go straight to that group; the reference is the member's mobile number | **Accepted** (Harry, 2026-10-04); request format and signing wait on the bank |
+| [0020](0020-operations-inbox-and-nightly-run.md) | An operations context: the nightly run drives each context's job in order, an operator inbox reads every group in turn, and a counts-only daily email digest | Proposed |
 
 All are **Proposed** until Harry accepts them. Harry's
 [foundational decisions](../architecture/foundational-decisions.md)

@@ -58,8 +58,17 @@ def tenant_scoped(table: str, *, system_rows: bool = False) -> tuple[str, str]:
 
 
 # ADR-0017: a row and every row it refers to belong to the same tenant.
-# Foreign key checks ignore row-level security, so the tenant must be part of
-# the key itself.
+# Foreign key checks on each new row ignore row-level security, so the tenant
+# must be part of the key itself.
+#
+# Adding a foreign key is different. PostgreSQL validates the rows already in
+# the table with an ordinary query, and under forced row-level security that
+# query sees only the rows the policy shows: with no tenant context, none.
+# The key is then marked valid without having looked at a single row
+# (found by the restore drill, 2026-10-04). So every key is added in a
+# declared cross-tenant step, where the policy shows every row.
+CROSS_TENANT_ON = "SELECT set_config('app.cross_tenant', 'on', true);"
+CROSS_TENANT_OFF = "SELECT set_config('app.cross_tenant', '', true);"
 
 def tenant_keyed(table: str) -> tuple[str, str]:
     """(forward, reverse) SQL: let other rows refer to (id, tenant_id)."""
@@ -72,8 +81,10 @@ def same_tenant(table: str, column: str, parent: str) -> tuple[str, str]:
     of the same tenant, in any mode, for any role. Deferred like Django's own
     keys. A null reference is not checked, as with any foreign key."""
     name = f"{table}_{column}_same_tenant"
-    return (f"""ALTER TABLE {table} ADD CONSTRAINT {name} FOREIGN KEY ({column}, tenant_id)
-                REFERENCES {parent} (id, tenant_id) DEFERRABLE INITIALLY DEFERRED;""",
+    return (f"""{CROSS_TENANT_ON}
+                ALTER TABLE {table} ADD CONSTRAINT {name} FOREIGN KEY ({column}, tenant_id)
+                REFERENCES {parent} (id, tenant_id) DEFERRABLE INITIALLY DEFERRED;
+                {CROSS_TENANT_OFF}""",
             f"ALTER TABLE {table} DROP CONSTRAINT IF EXISTS {name};")
 
 
@@ -89,4 +100,26 @@ def no_existing_violations(check: str, message: str) -> str:
         END IF;
         PERFORM set_config('app.cross_tenant', '', true);
     END $$;
+    """
+
+
+def revalidate_foreign_keys() -> str:
+    """SQL that drops and re-adds every foreign key in the schema, in a
+    cross-tenant step, so PostgreSQL checks the rows already there across
+    every tenant. A key that existing rows break stops the migration."""
+    return f"""
+    {CROSS_TENANT_ON}
+    DO $$
+    DECLARE k record;
+    BEGIN
+        FOR k IN SELECT conrelid::regclass AS tbl, conname, pg_get_constraintdef(oid) AS def
+                 FROM pg_constraint WHERE contype = 'f' AND connamespace = 'public'::regnamespace
+                 ORDER BY conrelid::regclass::text, conname
+        LOOP
+            -- re-added in full, even a key that was added NOT VALID
+            EXECUTE format('ALTER TABLE %s DROP CONSTRAINT %I, ADD CONSTRAINT %I %s', k.tbl, k.conname, k.conname,
+                           replace(k.def, ' NOT VALID', ''));
+        END LOOP;
+    END $$;
+    {CROSS_TENANT_OFF}
     """

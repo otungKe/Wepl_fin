@@ -30,6 +30,12 @@ def check_books(*, actor: str = "system") -> list[IntegrityCheck]:
         return checks
 
 
+def latest_checks() -> list[dict]:
+    """The most recent check of each fund's books in the current tenant."""
+    return list(IntegrityCheck.objects.order_by("fund_id", "currency", "-id").distinct("fund_id", "currency")
+                .values("fund_id", "currency", "passed", "checked_at"))
+
+
 def _check(fund_id: int, currency: str) -> IntegrityCheck:
     tb, pos = trial_balance(fund_id), fund_position(fund_id, currency)
     return IntegrityCheck.objects.create(

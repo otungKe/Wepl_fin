@@ -27,6 +27,7 @@ INSTALLED_APPS = [
     "contexts.ledger.infrastructure.apps.LedgerConfig",
     "contexts.governance.infrastructure.apps.GovernanceConfig",
     "contexts.custody.infrastructure.apps.CustodyConfig",
+    "contexts.operations.infrastructure.apps.OperationsConfig",
 ]
 
 # The simulated custodian bank, for tests and the investor demo. No context imports
@@ -87,3 +88,16 @@ if WEPL_ENABLE_SIMULATOR:
 WEPL_COLLECTIONS_SECRET = os.environ.get("WEPL_COLLECTIONS_SECRET", "")
 if WEPL_COLLECTIONS_SECRET and len(WEPL_COLLECTIONS_SECRET) < 32:
     raise RuntimeError("WEPL_COLLECTIONS_SECRET must be at least 32 characters.")
+
+# The operations digest (contexts/operations). Sent nightly to this address;
+# without one it is only logged. Email settings follow Django's EMAIL_*.
+WEPL_OPERATIONS_EMAIL = os.environ.get("WEPL_OPERATIONS_EMAIL", "")
+DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "WEPL operations <operations@localhost>")
+EMAIL_BACKEND = os.environ.get("EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend")
+EMAIL_HOST = os.environ.get("EMAIL_HOST", "localhost")
+EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))
+EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = os.environ.get("EMAIL_USE_TLS", "1") == "1"
+if not DEBUG and WEPL_OPERATIONS_EMAIL and EMAIL_BACKEND.rsplit(".", 2)[-2] in ("console", "locmem", "dummy"):
+    raise RuntimeError("WEPL_OPERATIONS_EMAIL is set but EMAIL_BACKEND would not send it.")

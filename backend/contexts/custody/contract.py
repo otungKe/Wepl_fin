@@ -1,5 +1,6 @@
 """Types a connector (a custodian integration) implements or produces."""
 from dataclasses import dataclass
+from datetime import datetime
 from decimal import Decimal
 
 from contexts.shared_kernel.money import Money
@@ -53,6 +54,7 @@ class ReconciliationView:
     balance_breaks: list
     open_alerts: int
     balanced: bool
+    run_at: datetime | None = None
 
     @property
     def cash(self) -> Money:
