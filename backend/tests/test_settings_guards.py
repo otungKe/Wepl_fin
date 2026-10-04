@@ -32,3 +32,9 @@ class BootGuardTests(TestCase):
     def test_a_correct_production_configuration_boots(self):
         result = boot(DJANGO_DEBUG="0", DJANGO_SECRET_KEY="a-real-secret", WEPL_ENABLE_SIMULATOR="0")
         self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_production_refuses_a_digest_that_would_never_be_sent(self):
+        result = boot(DJANGO_DEBUG="0", DJANGO_SECRET_KEY="a-real-secret", WEPL_ENABLE_SIMULATOR="0",
+                      WEPL_OPERATIONS_EMAIL="ops@example.org")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("EMAIL_BACKEND would not send it", result.stderr)

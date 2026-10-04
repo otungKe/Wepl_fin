@@ -13,6 +13,12 @@ def group_view(group_id: int) -> GroupView:
     return GroupView(id=g.pk, tenant_id=g.tenant_id, name=g.name)
 
 
+def groups() -> list[GroupView]:
+    """The groups visible here: under row-level security, the current
+    tenant's one group (ADR-0010)."""
+    return [GroupView(id=g.pk, tenant_id=g.tenant_id, name=g.name) for g in Group.objects.order_by("pk")]
+
+
 def fund_view(fund_id: int) -> FundView:
     """Raises CommunityError for an unknown fund or, under row-level
     security, another tenant's: the two are indistinguishable."""

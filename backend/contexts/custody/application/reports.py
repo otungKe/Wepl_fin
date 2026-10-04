@@ -33,7 +33,7 @@ def open_alerts(group_id: int, kind: str | None = None) -> list[dict]:
     qs = Alert.objects.filter(group_id=group_id, resolved_at__isnull=True)
     if kind:
         qs = qs.filter(kind=kind)
-    return list(qs.order_by("id").values("id", "kind", "line_id", "message"))
+    return list(qs.order_by("id").values("id", "kind", "line_id", "message", "created_at"))
 
 
 def line_trail(line_id: int) -> dict:

@@ -22,6 +22,7 @@ other's models directly, and kept rules in `services.py` files.
 | `custody` | Custodian accounts, statement lines, how each was accounted for, alerts, reconciliation | The money, mandates, the journal |
 | `notifications` | Messages decided on (outbox) and their delivery | Deciding what is worth saying |
 | `audit` | Accountability records and operation ids | Operational logs |
+| `operations` | The operator inbox, the daily digest and the nightly run (ADR-0020) | The problems it reports; resolving them; who in a group is told |
 | `shared_kernel` | `Money` | Any business rule |
 
 Each context has, only where needed:
