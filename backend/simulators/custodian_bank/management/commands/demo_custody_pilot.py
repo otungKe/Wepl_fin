@@ -28,7 +28,8 @@ SIGNATORY = (Capability.APPROVE_PAYOUT, Capability.CANCEL_PAYOUT, Capability.COR
 RULES = {"approvals": [{"up_to": "20000", "approvers": "designated", "required": 2},
                        {"up_to": None, "approvers": "members", "required": 4}],
          "bank_charges": "pro_rata", "interest": "pro_rata", "mandate_valid_days": 14,
-         "leaver_balances": "frozen_at_leaving"}
+         "leaver_balances": "frozen_at_leaving",
+         "leaver_rule_version": "at_leaving", "leaver_payouts": "never"}
 
 
 class Command(BaseCommand):

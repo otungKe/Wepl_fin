@@ -14,7 +14,7 @@ def _view(m: Mandate) -> MandateView:
     return MandateView(id=m.pk, group_id=m.group_id, fund_id=m.fund_id, reference=m.reference,
                        amount=Money(m.amount, m.currency), payee_name=m.payee_name, payee_account=m.payee_account,
                        allocation=Allocation(m.allocation), charged_member_id=m.charged_member_id,
-                       status=MandateStatus(m.status), expires_at=m.expires_at)
+                       status=MandateStatus(m.status), expires_at=m.expires_at, issued_at=m.issued_at)
 
 
 def mandate(mandate_id: int) -> MandateView:

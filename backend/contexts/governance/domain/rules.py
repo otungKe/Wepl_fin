@@ -34,6 +34,26 @@ class LeaverBalances(StrEnum):
     FROZEN_AT_LEAVING = "frozen_at_leaving"   # takes part in no interest or charge dated after it left
 
 
+class LeaverRuleVersion(StrEnum):
+    """Which version of the leaver rules applies to someone who has already
+    left, when the group adopts a new constitution (ADR-0014)."""
+    AT_LEAVING = "at_leaving"  # the version in force on the day they left
+    CURRENT = "current"        # the version in force on the day of each event
+
+
+class LeaverPayouts(StrEnum):
+    """Whether a former member bears a share of group spending paid out after
+    they left (ADR-0014)."""
+    NEVER = "never"
+    APPROVED_BEFORE_LEAVING = "approved_before_leaving"  # only if the group approved it while they were a member
+    ALWAYS = "always"
+
+
+# The group's own choices: a constitution adopted from ADR-0014 on must state each.
+LEAVER_CHOICES = {"leaver_balances": LeaverBalances, "leaver_rule_version": LeaverRuleVersion,
+                  "leaver_payouts": LeaverPayouts}
+
+
 @dataclass(frozen=True)
 class ApprovalTier:
     up_to: Money | None
@@ -51,10 +71,23 @@ class ConstitutionRules:
     # None only in versions adopted before ADR-0014. They read as frozen,
     # because that is what the software did while they were in force.
     leaver_balances: LeaverBalances | None = None
+    leaver_rule_version: LeaverRuleVersion | None = None
+    leaver_payouts: LeaverPayouts | None = None
 
     @property
     def leaver_treatment(self) -> LeaverBalances:
         return self.leaver_balances or LeaverBalances.FROZEN_AT_LEAVING
+
+    @property
+    def leaver_version(self) -> LeaverRuleVersion:
+        return self.leaver_rule_version or LeaverRuleVersion.AT_LEAVING
+
+    @property
+    def leaver_payout_share(self) -> LeaverPayouts:
+        return self.leaver_payouts or LeaverPayouts.NEVER
+
+    def missing_choices(self) -> list[str]:
+        return [name for name in LEAVER_CHOICES if getattr(self, name) is None]
 
     @classmethod
     def parse(cls, raw: dict) -> ConstitutionRules:
@@ -87,7 +120,7 @@ class ConstitutionRules:
             return cls(tiers=tuple(tiers), allow_self_approval=bool(raw.get("allow_self_approval", False)),
                        bank_charges=SharingRule(raw.get("bank_charges", "pro_rata")),
                        interest=SharingRule(raw.get("interest", "pro_rata")), mandate_valid_days=days,
-                       leaver_balances=LeaverBalances(raw["leaver_balances"]) if raw.get("leaver_balances") else None)
+                       **{name: kind(raw[name]) if raw.get(name) else None for name, kind in LEAVER_CHOICES.items()})
         except ValueError as exc:
             raise RulesError(str(exc)) from None
 
@@ -97,7 +130,7 @@ class ConstitutionRules:
                            "required": t.required} for t in self.tiers],
             "allow_self_approval": self.allow_self_approval, "bank_charges": self.bank_charges.value,
             "interest": self.interest.value, "mandate_valid_days": self.mandate_valid_days,
-            **({"leaver_balances": self.leaver_balances.value} if self.leaver_balances else {}),
+            **{name: getattr(self, name).value for name in LEAVER_CHOICES if getattr(self, name) is not None},
         }
 
     def tier_for(self, amount: Money) -> ApprovalTier:

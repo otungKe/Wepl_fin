@@ -13,7 +13,8 @@ from contexts.governance.public import (Capability, GovernanceError, adopt_const
                                         propose_withdrawal, revoke)
 from tests.scenario import act_for_new_group
 
-RULES = {"approvals": [{"up_to": None, "approvers": "designated", "required": 1}], "leaver_balances": "frozen_at_leaving"}
+RULES = {"approvals": [{"up_to": None, "approvers": "designated", "required": 1}],
+         "leaver_balances": "frozen_at_leaving", "leaver_rule_version": "at_leaving", "leaver_payouts": "never"}
 
 
 class CapabilityTests(TestCase):

@@ -116,7 +116,7 @@ def _withdrawal(ea, line):
                           candidates=[] if quoted else issued_for_amount(ea.fund_id, amount))
     if match.mandate_id and execute_mandate(match.mandate_id, line_id=line.pk, when=line.posted_at):
         m = mandate(match.mandate_id)
-        ids, balances = bk.sharing_facts(ea, at=line.posted_at, event=Event.PAYOUT)
+        ids, balances = bk.sharing_facts(ea, at=line.posted_at, event=Event.PAYOUT, approved_at=m.issued_at)
         draft = accounting.authorised_payout(bk.book(ea), key=f"line:{line.pk}:payout", line_id=line.pk, amount=amount,
                                              allocation=m.allocation, charged_member_id=m.charged_member_id,
                                              member_ids=ids, balances=balances, reference=m.reference)

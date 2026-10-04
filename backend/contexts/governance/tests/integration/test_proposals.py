@@ -13,7 +13,8 @@ from tests.scenario import SIGNATORY, act_for_new_group
 
 RULES = {"approvals": [{"up_to": "20000", "approvers": "designated", "required": 2},
                        {"up_to": None, "approvers": "members", "required": 3}],
-         "leaver_balances": "frozen_at_leaving"}
+         "leaver_balances": "frozen_at_leaving",
+         "leaver_rule_version": "at_leaving", "leaver_payouts": "never"}
 
 
 class ProposalTests(TestCase):
@@ -121,14 +122,15 @@ class ProposalTests(TestCase):
                 with transaction.atomic():
                     action()
 
-    def test_a_constitution_must_choose_what_happens_to_a_leavers_balance(self):
-        """ADR-0014: no default; the group decides at onboarding."""
+    def test_a_constitution_must_state_each_leaver_choice(self):
+        """ADR-0014: no defaults; the group decides each one."""
         from contexts.governance.public import RulesError, rules_in_force
-        silent = {k: v for k, v in RULES.items() if k != "leaver_balances"}
-        with self.assertRaisesMessage(RulesError, "leaver_balances"):
-            adopt_constitution(self.group.id, silent, actor="t")
-        with self.assertRaises(RulesError):
-            adopt_constitution(self.group.id, {**RULES, "leaver_balances": "whatever"}, actor="t")
+        for choice in ("leaver_balances", "leaver_rule_version", "leaver_payouts"):
+            silent = {k: v for k, v in RULES.items() if k != choice}
+            with self.subTest(choice), self.assertRaisesMessage(RulesError, choice):
+                adopt_constitution(self.group.id, silent, actor="t")
+            with self.subTest(choice), self.assertRaises(RulesError):
+                adopt_constitution(self.group.id, {**RULES, choice: "whatever"}, actor="t")
         first = Constitution.objects.get(group_id=self.group.id, version=1).effective_from
         adopt_constitution(self.group.id, {**RULES, "leaver_balances": "shares_until_paid"}, actor="t")
         self.assertEqual(rules_in_force(self.group.id, first)[1].leaver_balances.value, "frozen_at_leaving")

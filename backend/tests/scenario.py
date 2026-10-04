@@ -15,6 +15,7 @@ RULES = {
     "approvals": [{"up_to": "20000", "approvers": "designated", "required": 2},
                   {"up_to": None, "approvers": "members", "required": 3}],
     "bank_charges": "pro_rata", "interest": "pro_rata", "leaver_balances": "frozen_at_leaving",
+    "leaver_rule_version": "at_leaving", "leaver_payouts": "never",
 }
 # The pilot constitution names three officials and gives them these powers.
 # The titles are labels; the grants are what the software checks (ADR-0011).

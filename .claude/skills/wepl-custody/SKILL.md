@@ -98,9 +98,10 @@ reconciles; the alert is the control, not the reconciliation.
 ## Sharing and leavers (ADR-0014)
 
 - `domain/sharing.py` decides who shares an event, judged on the line's
-  `posted_at`: members in the group that day; leavers only for interest and
-  charges, only under `shares_until_paid` as in force when they left, and
-  only while their balance is above zero; never a payout after leaving.
+  `posted_at`: members in the group that day; leavers only as the group's
+  own constitution choices say (`leaver_balances`, `leaver_rule_version`,
+  `leaver_payouts`; no defaults). Never invent a leaver rule: add a group
+  choice instead.
 
 ## Do not assume
 
