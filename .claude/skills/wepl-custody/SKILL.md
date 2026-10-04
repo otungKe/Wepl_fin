@@ -103,6 +103,23 @@ reconciles; the alert is the control, not the reconciliation.
 - `tests/test_isolation.py`
 - `tests/test_properties.py`
 
+## The bank's collections service on a group's account (ADR-0019, Proposed)
+
+- A group's account linked with connector `business_connect` can take the
+  bank's calls (`contexts/custody/api/`, `application/collections.py`).
+- **`POST /collections/validate`** accepts a reference only if it is the
+  mobile number or member code of a current member of the group whose
+  account is named.
+- **`POST /collections/notify`** sends the payment to that group's
+  ordinary `ingest`.
+- Finding the account from its number is the only cross-tenant step.
+- Every request is signed (HMAC over `timestamp.body`, 5-minute window).
+  The endpoints are off until `WEPL_COLLECTIONS_SECRET` is set.
+- The payload is a placeholder until the bank's format is agreed.
+- Attribution order: member code → a mobile number quoted as the reference
+  (`attribution.quoted_msisdn`) → a remembered payer → the payer's own
+  number. A quoted number that is not a current member's is held.
+
 ## The pooled collection account (withdrawn)
 
 One WEPL collection account for every group was designed and built (ADR-0018),

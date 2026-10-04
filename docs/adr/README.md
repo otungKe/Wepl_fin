@@ -20,6 +20,7 @@
 | [0016](0016-derived-balances-at-scale.md) | Balances stay derived from full history; measured, with indexes RLS can use; checkpoints only past 100,000 lines in a fund | Proposed (follows Harry's measurement request) |
 | [0017](0017-linked-rows-keep-their-tenant.md) | A row and every row it refers to share a tenant: composite foreign keys, plus checks for plain ids installed by the dependent context | **Accepted** (Harry); implemented |
 | [0018](0018-pooled-collection-account.md) | One WEPL collection account, each fund a sub-ledger, routed by payment reference | Withdrawn (Harry, 2026-10-04): kept as a fallback; code in commit `79cb91f` |
+| [0019](0019-collections-service-on-each-group-account.md) | The bank's collections service on each group's own account: the reference check and notifications go straight to that group; the reference is the member's mobile number | Proposed (Harry chose per-group accounts, 2026-10-04) |
 
 All are **Proposed** until Harry accepts them. Harry's
 [foundational decisions](../architecture/foundational-decisions.md)

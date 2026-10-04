@@ -35,6 +35,16 @@ class AttributionTests(SimpleTestCase):
         self.assertEqual(self.attr(payer_msisdn="0733000000", remembered_payers={"254733000000": 1}), 1)
         self.assertEqual(self.attr(payer_msisdn="+254712000002"), 2)
 
+    def test_a_mobile_number_quoted_as_the_reference_names_the_member(self):
+        """Someone may pay for a member by typing that member's number (ADR-0019)."""
+        for typed in ("0712000002", "0712 000 002", "+254712000002", "#254712000002"):
+            with self.subTest(typed):
+                self.assertEqual(self.attr(reference=typed, payer_msisdn="0712000001"), 2)
+        self.assertIsNone(self.attr(reference="0799999999", payer_msisdn="0712000001"))  # said who; held
+        self.assertEqual(self.attr(reference="school fees 0712000002", payer_msisdn="0712000001"), 1)  # free text
+        ended = [MemberFacts(2, "M02", "254712000002", active=False)]
+        self.assertIsNone(self.attr(members=ended, reference="0712000002"))
+
     def test_an_ended_spells_code_always_means_that_spell(self):
         """John was M01, left, and is M03 now. A payment quoting M01 is held for
         a person to decide; it is never moved to M03 or credited to M01."""
