@@ -1,12 +1,13 @@
 # ADR-0019: The bank's collections service on each group's own account
 
-- **Status:** Proposed (2026-10-04).
+- **Status:** **Accepted** (Harry, 2026-10-04).
   - Harry returned to one account per group on 2026-10-04 (ADR-0006 stands:
     WEPL never holds money).
   - He confirmed that any account, a chama account included, can use the
     bank's collections service (Business Connect).
-  - The mechanism is settled at the sit-down with the bank's developers.
-  - Accepted only on Harry's word.
+  - The decision is accepted. The request format and the signing
+    mechanism are still settled at the sit-down with the bank's developers
+    (items 7 and 8).
 - **Replaces:** ADR-0018 (pooled account, withdrawn and kept as a fallback).
 - **Touches:**
   - ADR-0006 (statements become notifications plus a daily file);

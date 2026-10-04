@@ -103,7 +103,7 @@ reconciles; the alert is the control, not the reconciliation.
 - `tests/test_isolation.py`
 - `tests/test_properties.py`
 
-## The bank's collections service on a group's account (ADR-0019, Proposed)
+## The bank's collections service on a group's account (ADR-0019, Accepted)
 
 - A group's account linked with connector `business_connect` can take the
   bank's calls (`contexts/custody/api/`, `application/collections.py`).
