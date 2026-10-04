@@ -63,6 +63,7 @@ class UnknownAccount(LookupError):
 
 def _account(account_number: str) -> tuple[int, int] | None:
     with cross_tenant("custody: find the group whose account the bank named", actor="bank"):
-        rows = list(ExternalAccount.objects.filter(account_number=account_number, connector=CONNECTOR)
+        rows = list(ExternalAccount.objects.filter(account_number=account_number, connector=CONNECTOR,
+                                                   closed_at__isnull=True)
                     .values_list("pk", "tenant_id")[:2])
     return rows[0] if len(rows) == 1 else None

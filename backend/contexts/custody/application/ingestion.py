@@ -6,7 +6,7 @@ from contexts.communities.public import group_view, members
 from contexts.governance.public import execute_mandate, find_by_reference, issued_for_amount, mandate
 from contexts.notifications.public import notify
 
-from ..contract import IngestResult
+from ..contract import CustodyError, IngestResult
 from ..domain import accounting
 from ..domain.attribution import MemberFacts, attribute
 from ..domain.matching import match_outflow, quoted_references
@@ -35,6 +35,9 @@ def ingest(ea_id: int, bank_lines) -> IngestResult:
                         _conflict(ea, existing, bl)
                         result.conflicts += 1
                     continue
+                if ea.closed_at is not None:  # the database refuses it too (custody 0007)
+                    raise CustodyError(f"{ea.institution} {ea.account_number} was closed on {ea.closed_at:%d %b %Y}, "
+                                       f"but the custodian reports a new transaction {bl.external_id}.")
                 line = StatementLine.objects.create(
                     external_account=ea, external_id=bl.external_id, sequence=bl.sequence, posted_at=bl.posted_at,
                     kind=LineKind(bl.kind), amount=bl.amount, narration=bl.narration[:255],

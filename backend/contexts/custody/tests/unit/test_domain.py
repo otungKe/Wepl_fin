@@ -154,3 +154,17 @@ class ReconciliationAndCorrectionTests(SimpleTestCase):
                              (None, Outcome.ATTRIBUTED)):
             with self.assertRaises(InvalidCorrection):
                 ensure_correction(current, new)
+
+
+class ClosingRefusalsTests(SimpleTestCase):
+    """ADR-0015: an account closes only when nothing is left or in question."""
+
+    def test_reasons(self):
+        from contexts.custody.domain.closing import closing_refusals
+        from contexts.custody.domain.reconciliation import assess
+        clean = assess(statement_balance=Money("0"), ledger_cash=Money("0"), sequences=[1, 2], unresolved=0)
+        self.assertEqual(closing_refusals(clean, statement_balance=Money("0"), open_alerts=0), [])
+        never_used = assess(statement_balance=None, ledger_cash=Money("0"), sequences=[], unresolved=0)
+        self.assertEqual(closing_refusals(never_used, statement_balance=None, open_alerts=0), [])
+        messy = assess(statement_balance=Money("5"), ledger_cash=Money("0"), sequences=[1, 3], unresolved=1)
+        self.assertEqual(len(closing_refusals(messy, statement_balance=Money("5"), open_alerts=2)), 5)
