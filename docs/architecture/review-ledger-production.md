@@ -248,7 +248,8 @@ The test is written when the sample arrives. It will:
 4. Show every statement line is accounted for: attributed, matched to a
    mandate, or alerted; none silently dropped.
 5. Show sequence gaps and duplicates are detected on the real numbering
-   scheme.
+   scheme, and a missing line by the running-balance chain (added
+   2026-10-03, after the statement samples showed no transaction ids).
 6. Show the fund position invariant holds afterwards.
 
 Today, steps 2–6 are proven only against the simulator (custody

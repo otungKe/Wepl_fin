@@ -6,7 +6,7 @@ from contexts.notifications.public import notify
 from contexts.shared_kernel.money import Money
 
 from ..contract import IngestResult, ReconciliationView
-from ..domain.reconciliation import assess
+from ..domain.reconciliation import assess, balance_breaks
 from ..domain.statement import Connector, LineKind
 from ..infrastructure.models import Alert, ExternalAccount, ReconciliationRun
 from . import bookkeeping as bk
@@ -18,7 +18,7 @@ def _view(r: ReconciliationRun) -> ReconciliationView:
         id=r.pk, statement_balance=r.statement_balance, ledger_cash=r.ledger_cash, difference=r.difference,
         member_interests=r.member_interests, unattributed=r.unattributed, unexplained_out=r.unexplained_out,
         retained=r.retained, lines_seen=r.lines_seen, lines_unresolved=r.lines_unresolved,
-        sequence_gaps=r.sequence_gaps, open_alerts=r.open_alerts, balanced=r.balanced)
+        sequence_gaps=r.sequence_gaps, balance_breaks=r.balance_breaks, open_alerts=r.open_alerts, balanced=r.balanced)
 
 
 @transaction.atomic  # the account lock gives a consistent snapshot of lines and books
@@ -32,14 +32,15 @@ def reconcile(ea_id: int) -> ReconciliationView:
         a = assess(statement_balance=Money(last.running_balance, cur) if last else None,
                    ledger_cash=account_balance(bk.book(ea).cash()),
                    sequences=list(lines.exclude(kind=LineKind.OPENING).values_list("sequence", flat=True)),
-                   unresolved=lines.filter(resolutions__isnull=True).count())
+                   unresolved=lines.filter(resolutions__isnull=True).count(),
+                   breaks=balance_breaks(lines.values_list("sequence", "kind", "amount", "running_balance")))
         pos = fund_position(ea.fund_id, cur)
         run = ReconciliationRun.objects.create(
             external_account=ea, statement_balance=last.running_balance if last else None,
             ledger_cash=pos.cash.amount, difference=a.difference.amount if a.difference else None,
             member_interests=pos.member_interests.amount, unattributed=pos.unattributed.amount,
             unexplained_out=pos.unexplained_out.amount, retained=pos.retained.amount, lines_seen=lines.count(),
-            lines_unresolved=a.unresolved, sequence_gaps=list(a.gaps[:100]),
+            lines_unresolved=a.unresolved, sequence_gaps=list(a.gaps[:100]), balance_breaks=list(a.breaks[:100]),
             open_alerts=Alert.objects.filter(group_id=ea.group_id, resolved_at__isnull=True).count(),
             balanced=a.balanced, operation_id=current_operation_id())
         record("system", "custody.reconciled", target_type="external_account", target_id=ea.pk, group_id=ea.group_id,
@@ -48,7 +49,8 @@ def reconcile(ea_id: int) -> ReconciliationView:
             alert = Alert.objects.create(
                 group_id=ea.group_id, kind=Alert.Kind.RECONCILIATION_DIFFERENCE,
                 message=(f"Reconciliation {run.pk}: difference {run.difference}, missing sequence numbers "
-                         f"{list(a.gaps[:5])}, unaccounted lines {a.unresolved}.")[:255])
+                         f"{list(a.gaps[:5])}, running balance broken at {list(a.breaks[:5])}, "
+                         f"unaccounted lines {a.unresolved}.")[:255])
             notify("ops.reconciliation_difference", {"run_id": run.pk, "alert_id": alert.pk},
                    dedupe_key=f"ops.reconciliation_difference:{run.pk}")
         return _view(run)

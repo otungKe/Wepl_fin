@@ -1,12 +1,14 @@
 from datetime import datetime, timezone
+from decimal import Decimal
 
 from django.test import SimpleTestCase
 
 from contexts.custody.domain import accounting
 from contexts.custody.domain.accounting import AccountingError, FundBook
 from contexts.custody.domain.attribution import MemberFacts, attribute
+from contexts.custody.domain.collections import RouteKind, parse_reference, route
 from contexts.custody.domain.matching import match_outflow, quoted_references
-from contexts.custody.domain.reconciliation import assess
+from contexts.custody.domain.reconciliation import assess, balance_breaks
 from contexts.custody.domain.resolution import InvalidCorrection, Outcome, ensure_correction
 from contexts.governance.contract import Allocation, MandateStatus, MandateView, SharingRule
 from contexts.ledger.contract import AccountPurpose, Side
@@ -119,6 +121,22 @@ class ReconciliationAndCorrectionTests(SimpleTestCase):
         diff = assess(statement_balance=Money("10"), ledger_cash=Money("7"), sequences=[1], unresolved=0)
         self.assertEqual(diff.difference, Money("-3"))
         self.assertFalse(assess(statement_balance=None, ledger_cash=Money("0"), sequences=[1], unresolved=1).balanced)
+        broken = assess(statement_balance=Money("10"), ledger_cash=Money("10"), sequences=[1, 2], unresolved=0,
+                        breaks=(2,))
+        self.assertFalse(broken.balanced)
+
+    def test_running_balance_chain(self):
+        D = Decimal
+        chain = [(0, "opening", D("100"), D("100")), (1, "deposit", D("50"), D("150")),
+                 (2, "withdrawal", D("30"), D("120")), (3, "charge", D("5"), D("115")),
+                 (4, "interest", D("1"), D("116"))]
+        self.assertEqual(balance_breaks(chain), ())
+        without_line_2 = [chain[0], chain[1], chain[3], chain[4]]
+        self.assertEqual(balance_breaks(without_line_2), (3,))  # reported once, where it shows
+        unknown = [chain[0], (1, "deposit", D("50"), None), chain[2]]
+        self.assertEqual(balance_breaks(unknown), ())  # carried to the next printed balance
+        self.assertEqual(balance_breaks([(1, "deposit", D("50"), D("80"))]), (1,))  # an account starts at zero
+        self.assertEqual(balance_breaks([]), ())
 
     def test_only_listed_corrections_are_allowed(self):
         ensure_correction(Outcome.UNATTRIBUTED, Outcome.ATTRIBUTED)
@@ -127,3 +145,36 @@ class ReconciliationAndCorrectionTests(SimpleTestCase):
                              (None, Outcome.ATTRIBUTED)):
             with self.assertRaises(InvalidCorrection):
                 ensure_correction(current, new)
+
+
+class PooledRoutingTests(SimpleTestCase):
+    def test_a_reference_reads_the_same_however_it_is_typed(self):
+        for typed in ("1234566 0712597024", "1234566#0712 597 024", "12345660712597024", "1234566#254712597024",
+                      "1234566-+254712597024", "1234566 712597024"):
+            with self.subTest(typed):
+                ref = parse_reference(typed)
+                self.assertEqual((ref.group_code, ref.msisdn), ("1234566", "254712597024"))
+                self.assertEqual(str(ref), "1234566 0712597024")
+        for wrong in ("", "1234566", "1234566 0812597024", "123456 0712597024", "1234566 07125970",
+                      "chama contribution"):
+            with self.subTest(wrong):
+                self.assertIsNone(parse_reference(wrong))
+
+    def test_a_mistyped_code_names_no_group(self):
+        code = "1234566"
+        typos = {code[:i] + d + code[i + 1:] for i in range(7) for d in "0123456789"} - {code}
+        swaps = {code[:i] + code[i + 1] + code[i] + code[i + 2:] for i in range(6)} - {code}
+        for typed in typos | swaps:
+            with self.subTest(typed):
+                self.assertIsNone(parse_reference(f"{typed} 0712597024"))
+
+    def test_only_what_a_transaction_quotes_routes_it(self):
+        self.assertEqual(route(kind="deposit", reference="1234566 0712597024", quoted_mandates=()).kind,
+                         RouteKind.BY_PAYMENT_CODE)
+        self.assertEqual(route(kind="deposit", reference="contribution", quoted_mandates=()).kind, RouteKind.HOLD)
+        self.assertEqual(route(kind="withdrawal", reference="", quoted_mandates=("WMABCDEF",)).key, "WMABCDEF")
+        self.assertEqual(route(kind="withdrawal", reference="", quoted_mandates=()).kind, RouteKind.HOLD)
+        self.assertEqual(route(kind="withdrawal", reference="", quoted_mandates=("WMABCDEF", "WMBCDEFG")).kind,
+                         RouteKind.HOLD)
+        for kind in ("interest", "charge"):
+            self.assertEqual(route(kind=kind, reference="1234566 0712597024", quoted_mandates=()).kind, RouteKind.HOLD)

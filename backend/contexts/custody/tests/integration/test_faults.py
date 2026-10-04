@@ -7,7 +7,7 @@ from django.test import TestCase
 
 from contexts.custody.application.ingestion import account_for
 from contexts.custody.infrastructure.models import Alert, ExternalAccount, StatementLine
-from contexts.custody.public import ingest
+from contexts.custody.public import ingest, reconcile
 from contexts.ledger.infrastructure.models import JournalEntry
 from simulators.custodian_bank import bank
 from simulators.custodian_bank.connector import Faults, SimulatorConnector
@@ -65,3 +65,23 @@ class FaultTests(TestCase):
         for line in StatementLine.objects.all():
             account_for(ea, line)  # e.g. a retried job after a crash
         self.assertEqual(JournalEntry.objects.count(), before)
+
+    def test_lines_left_out_without_a_numbering_gap_break_the_running_balance(self):
+        """A statement whose numbering is derived from the statement itself
+        shows no gap when lines are left out. Here a deposit and a charge
+        that cancel out are missing, with a line between them, so the closing
+        balance agrees too: only the running balance shows it."""
+        bank.deposit(N, "300", msisdn=self.s.m[0].msisdn, name="X")
+        bank.deposit(N, "50", msisdn=self.s.m[1].msisdn, name="X")
+        bank.charge(N, "300")
+        bank.deposit(N, "20", msisdn=self.s.m[2].msisdn, name="X")
+        lines = SimulatorConnector(sweep=True).fetch(N)
+        kept = [l for l in lines if l.amount != Decimal("300")]
+        renumbered = [replace(l, sequence=n) for n, l in enumerate(kept, start=1)]
+        ingest(self.s.ea.id, renumbered)
+        run = reconcile(self.s.ea.id)
+        self.assertEqual((run.sequence_gaps, run.difference), ([], 0))
+        n = len(renumbered)
+        self.assertEqual(run.balance_breaks, [n - 1, n])  # the lines after each missing 300
+        self.assertFalse(run.balanced)
+        self.assertIn("running balance broken at", Alert.objects.get(kind="recon_difference").message)
