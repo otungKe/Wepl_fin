@@ -36,7 +36,7 @@ ADR (guidelines 56–57).
 | a structural decision | a **new** ADR in `docs/adr/`, indexed in its README |
 
 The contexts are tenancy, identity, communities, governance, ledger, custody,
-notifications, audit, operations (ADR-0020) and shared_kernel. ADR-0002 says what each owns and does
+notifications, audit, operations (ADR-0020), operators (ADR-0021) and shared_kernel. ADR-0002 says what each owns and does
 not own, and each context's `__init__.py` repeats it.
 
 **Keep membership small (ADR-0012).** A membership holds only its group,

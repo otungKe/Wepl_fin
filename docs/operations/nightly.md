@@ -23,7 +23,7 @@ Linux host. A systemd timer works the same way.
 ## Each morning
 
 1. Read the digest. **No digest means the jobs did not run**: check the log.
-2. If it says URGENT, run `python manage.py operator_inbox --operator <your name>`.
+2. If it says URGENT, open the operator inbox: `GET /operators/inbox` when signed in, or on the server `python manage.py operator_inbox --operator <your email> --code <authenticator code>` (ADR-0021).
    Then phone the officials of each group listed (decision of 2026-09-28,
    while SMS is on hold).
 3. A failed job is named in the subject. Run it by hand to see the error,

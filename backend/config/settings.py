@@ -28,6 +28,7 @@ INSTALLED_APPS = [
     "contexts.governance.infrastructure.apps.GovernanceConfig",
     "contexts.custody.infrastructure.apps.CustodyConfig",
     "contexts.operations.infrastructure.apps.OperationsConfig",
+    "contexts.operators.infrastructure.apps.OperatorsConfig",
 ]
 
 # The simulated custodian bank, for tests and the investor demo. No context imports
@@ -101,3 +102,11 @@ EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
 EMAIL_USE_TLS = os.environ.get("EMAIL_USE_TLS", "1") == "1"
 if not DEBUG and WEPL_OPERATIONS_EMAIL and EMAIL_BACKEND.rsplit(".", 2)[-2] in ("console", "locmem", "dummy"):
     raise RuntimeError("WEPL_OPERATIONS_EMAIL is set but EMAIL_BACKEND would not send it.")
+
+# Operator sign-in (ADR-0021). Authenticator secrets are encrypted with this
+# key (a Fernet key: 32 random bytes, url-safe base64). Development derives
+# one from SECRET_KEY; production refuses to boot without its own.
+WEPL_OPERATOR_KEY = os.environ.get("WEPL_OPERATOR_KEY", "")
+if not DEBUG and not WEPL_OPERATOR_KEY:
+    raise RuntimeError("WEPL_OPERATOR_KEY must be set when DEBUG is off.")
+

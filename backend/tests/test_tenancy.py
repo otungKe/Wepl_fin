@@ -22,7 +22,8 @@ from contexts.tenancy.public import TenancyError, cross_tenant, current_tenant, 
 from simulators.custodian_bank import bank
 from tests.scenario import SIGNATORY, Scenario
 
-OURS = {"audit", "tenancy", "identity", "communities", "governance", "ledger", "custody", "notifications", "simulator"}
+OURS = {"audit", "tenancy", "identity", "communities", "governance", "ledger", "custody", "notifications", "simulator",
+        "operations", "operators"}
 
 
 def tenant_scoped_tables() -> list[str]:

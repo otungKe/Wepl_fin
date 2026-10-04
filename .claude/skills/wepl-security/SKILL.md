@@ -2,8 +2,9 @@
 name: wepl-security
 description: Who may do what in Wepl_fin. Covers what is enforced today
   (explicit capabilities, never titles; no self-benefit, maker-checker, votes, group
-  isolation, append-only history, boot guards, log redaction), what is not
-  built (login, KYC, operators), tenant isolation by row-level security,
+  isolation, append-only history, boot guards, log redaction, operator
+  sign-in), what is not built (member login, KYC), tenant isolation by
+  row-level security,
   and the rules to follow when they
   land. Use when touching a command that takes `by`, `actor` or a voter,
   settings, logging, notifications, or anything that decides who may act.
@@ -51,6 +52,9 @@ yet.
 | Every business action has an audit record with an operation id | `audit.public.record` / `operation` | throughout |
 | **Refuse to boot** with DEBUG off and the dev secret, or with DEBUG off and the simulated bank | `config/settings.py` | `tests/test_settings_guards.py` |
 | **Logs carry no phone numbers or names** | `notifications/domain/redaction.py` | `notifications/tests/unit/test_redaction.py` |
+| **Operators sign in** with a provisioned account: password, then an authenticator code (RFC 6238, each code once); staged sessions reach nothing until finished; 30-minute idle and 12-hour limits; five failures lock for 15 minutes and end open sessions; identical answers for unknown email, wrong password and locked | `contexts/operators` (ADR-0021) | `operators/tests/` |
+| **Operator capabilities fail closed**, by role in code; sensitive ones need a code from the last 10 minutes | `operators/domain/capabilities.py` | same |
+| **Production refuses to boot without `WEPL_OPERATOR_KEY`** (authenticator secrets are encrypted with it) | `config/settings.py` | `tests/test_settings_guards.py` |
 
 ### How a command names who is acting
 
@@ -66,28 +70,41 @@ yet.
   closed.
 - **Setup commands still take a free-text `actor`:** `create_group`,
   `add_member`, `adopt_constitution` and `link_external_account`. They are
-  operator actions, reachable only from management commands and tests. They
-  wait for operator identity (below).
+  operator actions, reachable only from code and tests. When each gets an
+  endpoint, it takes the operator from `operators.public.authenticate(token,
+  capability)` and audits `operator:<id>`; never a string from the request.
 - **Refusals raise the context's own error** (`CustodyError`,
   `GovernanceError`) with "Not authorised: …". Tests assert that nothing was
   written: no line resolution, no journal, no mandate claimed.
 
 ## What is not built (do not assume it exists)
 
-- **Authentication.** A membership id passed as `by` is trusted as given
+- **Member authentication.** A membership id passed as `by` is trusted as given
   (inside the tenant context, which RLS enforces). It
   says *which* member is claimed, not that the caller *is* that member.
   Today that is safe only because there is no HTTP surface (just `/health/`).
   **The first endpoint that accepts a command must take the actor from the
   session, never from the request body.**
-- **Operator (concierge / back-office) identity.** Operators are not members
-  and have no account type.
+- **A back-office screen.** Operators have the sign-in API and the inbox
+  endpoint only.
 - **KYC.**
 - **User-scoped row security.** People (`identity.Person`) are USER_SCOPED
   and have no RLS until login gives a user context (ADR-0009).
 - **Rate limiting.**
 
-## Rules for when login lands
+## Operator sign-in (built, ADR-0021)
+
+- Protect an operator endpoint with
+  `authenticate(request.COOKIES.get(COOKIE, ""), OperatorCapability.X)`
+  and answer `NotSignedIn` with a plain 401. Add a capability to
+  `domain/capabilities.py` (and `STEP_UP` if sensitive) with the endpoint
+  that needs it.
+- Server commands that act as an operator call
+  `operator_at_console(email, code, capability)`.
+- Under `ATOMIC_REQUESTS`, a failure that must be remembered (a wrong
+  password or code) is returned, never raised, or the count rolls back.
+
+## Rules for when member login lands
 
 ### Two identities, never mixed (borrowed)
 

@@ -1,8 +1,9 @@
 # ADR-0021: Operator login (WEPL staff)
 
 - **Status:** **Proposed** (2026-10-04). Step 5 of the plan Harry approved
-  ("Proceed as suggested", 2026-10-04). Harry has been asked whether
-  operators or members come first; this draft assumes operators.
+  ("Proceed as suggested", 2026-10-04). Harry chose **operators first**
+  (2026-10-04). The details below are the thread's proposal and are built;
+  Harry has not accepted them.
 - **Builds on:** ADR-0008 (who may act before login), ADR-0009 (tenancy),
   ADR-0011 (capabilities, never titles), ADR-0020 (operator inbox), and the
   `wepl-security` skill's "Rules for when login lands".
@@ -55,14 +56,48 @@
    `--operator EMAIL` naming an active operator and a current authenticator
    code, and are audited the same way.
 
+## As built (2026-10-04)
+
+- Context `operators`; endpoints under `/operators/`: `sign-in`,
+  `password`, `authenticator/begin`, `authenticator/confirm`, `code`,
+  `step-up`, `sign-out`, `me`, and `inbox` (the operator inbox, ADR-0020).
+- Sessions are rows of `OperatorSession`; the cookie `wepl_operator` holds
+  a random token and only its SHA-256 is stored. Path `/operators/`,
+  HttpOnly, Secure, SameSite=Strict. POST bodies must be JSON.
+- Roles and capabilities (`domain/capabilities.py`): `support` reads the
+  inbox; `onboarding` also sets groups up and links or closes bank
+  accounts; `admin` has everything, including managing operators. The
+  inbox, setup, bank-account and operator-management capabilities all need
+  a code entered in the last 10 minutes.
+- Authenticator codes follow RFC 6238 (tested against its vectors); a code
+  is accepted once. Secrets are encrypted with `WEPL_OPERATOR_KEY`
+  (Fernet, from the `cryptography` package, a new dependency). Production
+  refuses to boot without the key.
+- Wrong passwords and wrong codes both count toward the lock. Locking ends
+  the operator's open sessions.
+- **The sign-in log is the operators context's own append-only table**,
+  not the audit trail: the audit trail is tenant-scoped, and sign-in
+  happens outside any group. What an operator does inside a group is
+  audited there with actor `operator:<id>`.
+- `create_operator` creates the first admin with no operator named (only
+  while there are none); after that an admin names themselves with
+  `--by EMAIL --code CODE`. `deactivate_operator` and `operator_inbox`
+  work the same way.
+- **Not yet moved behind sign-in:** `create_group`, `add_member`,
+  `adopt_constitution`, `link_external_account` and
+  `close_external_account` are still reached only from code and tests with
+  a typed actor; there is no HTTP endpoint for them yet. Each moves behind
+  `authenticate(token, capability)` when its endpoint is built.
+
 ## Not decided (UNKNOWN)
 
 - What screen operators use. There is no back-office front end; this builds
   the login API and protects the setup actions behind it.
 - Password hashing: Django's default PBKDF2 unless Harry or the bank's
   security review asks for Argon2 (an extra dependency).
-- Where the authenticator secret key is kept in production (an encrypted
-  column with a key from the environment is the default proposed).
+- Where `WEPL_OPERATOR_KEY` lives in production (a secrets manager on the
+  host) and how it is rotated.
+- The role names and what each role may do.
 - Member login (phone code, then PIN) waits on the SMS provider.
 
 ## Alternatives
