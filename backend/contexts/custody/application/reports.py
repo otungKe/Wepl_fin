@@ -1,10 +1,10 @@
 """Read-only projections for members, the group and the bank. Never a source of truth."""
-from contexts.communities.public import group_view, members, membership
+from contexts.communities.public import fund_view, group_view, members, membership
 from contexts.ledger.public import fund_position, member_balances, member_movements
 from contexts.shared_kernel.money import Money
 
 from ..infrastructure.models import Alert, ExternalAccount, LineResolution, StatementLine
-from .reconciliation import latest_reconciliation
+from .reconciliation import account_funds, account_position, latest_reconciliation
 
 
 def member_statement(membership_id: int, fund_id: int) -> dict:
@@ -15,13 +15,18 @@ def member_statement(membership_id: int, fund_id: int) -> dict:
 
 
 def group_summary(ea_id: int) -> dict:
+    """The account and every fund held at it (ADR-0023). A member's
+    ``balance`` is what they hold across those funds; ``funds`` has each."""
     ea = ExternalAccount.objects.get(pk=ea_id)
-    pos = fund_position(ea.fund_id, ea.currency)
-    held = member_balances(ea.fund_id, ea.currency)
+    cur, zero = ea.currency, Money.zero(ea.currency)
+    by_fund = {f: member_balances(f, cur) for f in account_funds(ea)}
+    held = lambda m: sum((b.get(m, zero) for b in by_fund.values()), zero).amount
     return {
         "group": group_view(ea.group_id).name, "account": f"{ea.institution} {ea.account_number}",
-        "position": pos,
-        "members": [{"code": m.code, "name": m.name, "status": m.status, "balance": held.get(m.id, Money.zero(ea.currency)).amount}
+        "position": account_position(ea),
+        "funds": [{"fund": fund_view(f).name, "code": fund_view(f).code, "default": f == ea.fund_id,
+                   "position": fund_position(f, cur)} for f in by_fund],
+        "members": [{"code": m.code, "name": m.name, "status": m.status, "balance": held(m.id)}
                     for m in members(ea.group_id, active_only=False)],
         "open_alerts": list(Alert.objects.filter(group_id=ea.group_id, resolved_at__isnull=True).order_by("id")
                             .values("kind", "message")),

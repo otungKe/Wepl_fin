@@ -15,7 +15,7 @@
 | [0011](0011-membership-titles-and-capabilities.md) | Membership, an optional title (a label) and explicit capabilities are separate; a title grants nothing | Proposed (answers Harry's role review) |
 | [0012](0012-membership-is-small.md) | Membership owns only group, status, code and title; Segment describes the group; LEFT is final; member codes are never reused, enforced in PostgreSQL | Proposed (answers Harry's membership review) |
 | [0013](0013-founding-a-group.md) | A group founds its own tenant in one transaction; funds are opened separately; Segment removed; PostgreSQL allocates member codes on every insert | Proposed (follows Harry's application-layer review) |
-| [0014](0014-leaver-balances.md) | Does a leaver's unpaid balance share interest and charges until settled? Each group chooses in its constitution; judged on the event's date | Direction decided; built on recommended details awaiting confirmation |
+| [0014](0014-leaver-balances.md) | Does a leaver's unpaid balance share interest and charges until settled? Each group chooses in its constitution; judged on the event's date | Decided: every leaver rule is the group's choice; built |
 | [0015](0015-fund-lifecycle.md) | A fund is opened, renamed while open, closed only when empty in the ledger, governance and custody, never reopened or deleted | Accepted |
 | [0016](0016-derived-balances-at-scale.md) | Balances stay derived from full history; measured, with indexes RLS can use; checkpoints only past 100,000 lines in a fund | Proposed (follows Harry's measurement request) |
 | [0017](0017-linked-rows-keep-their-tenant.md) | A row and every row it refers to share a tenant: composite foreign keys, plus checks for plain ids installed by the dependent context | **Accepted** (Harry); implemented |
@@ -23,6 +23,8 @@
 | [0019](0019-collections-service-on-each-group-account.md) | The bank's collections service on each group's own account: the reference check and notifications go straight to that group; the reference is the member's mobile number | **Accepted** (Harry, 2026-10-04); request format and signing wait on the bank |
 | [0020](0020-operations-inbox-and-nightly-run.md) | An operations context: the nightly run drives each context's job in order, an operator inbox reads every group in turn, and a counts-only daily email digest | Proposed |
 | [0021](0021-operator-login.md) | How WEPL staff sign in: provisioned accounts, password plus authenticator, staged server-side sessions, capabilities that fail closed | Proposed (operators first: Harry); built |
+| [0022](0022-contributions-and-arrears.md) | Contributions and arrears: each fund's rule is the group's own constitution setting (schedule, amount, payment order, fines, leavers' arrears); arrears derived | Proposed; not built |
+| [0023](0023-one-account-holds-the-groups-funds.md) | One bank account holds all of a group's funds: fund code in the reference, else the default fund; interest and charges split as the group chooses; reconcile the account against all its funds | Code, else default: Harry; rest Proposed; built |
 
 All are **Proposed** until Harry accepts them. Harry's
 [foundational decisions](../architecture/foundational-decisions.md)

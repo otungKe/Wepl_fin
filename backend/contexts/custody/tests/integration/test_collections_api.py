@@ -50,6 +50,17 @@ class CollectionsApiTests(TestCase):
             with self.subTest(reference):
                 self.assertFalse(self.check(account, reference)["accepted"])
 
+    def test_a_reference_may_name_one_of_the_groups_funds(self):
+        """ADR-0023: one account, several funds; the code says which."""
+        from contexts.communities.public import open_fund
+        with self.s.acting():
+            open_fund(self.s.group.id, name="Welfare", code="WEL", actor="test")
+        self.assertTrue(self.check(self.s.account, f"{local(self.s.m[0])} WEL")["accepted"])
+        self.assertTrue(self.check(self.s.account, f"wel {self.s.m[1].code}")["accepted"])
+        refused = self.check(self.s.account, f"{local(self.s.m[0])} WLF")
+        self.assertEqual((refused["accepted"], "WLF" in refused["reason"]), (False, True))
+        self.assertFalse(self.check(self.t.account, f"{local(self.t.m[0])} WEL")["accepted"])  # not Tujenge's
+
     def test_a_payment_for_a_member_lands_in_their_groups_books_once(self):
         first = self.call("notify", self.payment())  # paid by someone else, for member 0
         again = self.call("notify", self.payment())

@@ -25,7 +25,18 @@ def fund_view(fund_id: int) -> FundView:
     f = Fund.objects.filter(pk=fund_id).first()
     if f is None:
         raise CommunityError(f"Unknown fund {fund_id}.")
-    return FundView(id=f.pk, group_id=f.group_id, name=f.name, currency=f.currency, status=f.status)
+    return _fund(f)
+
+
+def _fund(f: Fund) -> FundView:
+    return FundView(id=f.pk, group_id=f.group_id, name=f.name, currency=f.currency, status=f.status, code=f.code)
+
+
+def funds(group_id: int, *, open_only: bool = True) -> list[FundView]:
+    qs = Fund.objects.filter(group_id=group_id)
+    if open_only:
+        qs = qs.filter(status="open")
+    return [_fund(f) for f in qs.order_by("pk")]
 
 
 def _views(rows) -> list[MembershipView]:

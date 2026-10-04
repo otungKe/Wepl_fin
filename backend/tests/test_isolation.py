@@ -59,7 +59,7 @@ class CrossGroupTests(TestCase):
     def test_cannot_explain_an_outflow_with_another_groups_mandate(self):
         with self.widened():
             foreign = Mandate.objects.get(reference=self.b_ref).pk
-            with self.assertRaisesMessage(CustodyError, "this fund"):
+            with self.assertRaisesMessage(CustodyError, "this group's"):
                 explain_outflow(self.a_atm, foreign, by=self.a.m[0].id)
         self.assert_nothing_written()
 

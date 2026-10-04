@@ -2,7 +2,7 @@ from django.db import transaction
 
 from contexts.audit.public import record
 
-from ..domain.rules import ConstitutionRules, LeaverBalances, RulesError
+from ..domain.rules import REQUIRED_CHOICES, ConstitutionRules, RulesError
 from ..infrastructure.models import Constitution
 
 
@@ -11,9 +11,9 @@ def adopt_constitution(group_id: int, rules: dict, *, actor: str) -> int:
     """Adopt a new version. Earlier versions stay, and proposals keep the
     version they were made under. (Pilot: the group signs it off on paper.)"""
     parsed = ConstitutionRules.parse(rules)
-    if parsed.leaver_balances is None:  # no default: the group chooses (ADR-0014)
-        raise RulesError(f"The constitution must say what happens to a leaver's balance: leaver_balances is one of "
-                         f"{[v.value for v in LeaverBalances]}.")
+    if missing := parsed.missing_choices():  # no defaults: the group chooses (ADR-0014, ADR-0023)
+        raise RulesError("The constitution must state the group's own choice for "
+                         + "; ".join(f"{n} (one of {[v.value for v in REQUIRED_CHOICES[n]]})" for n in missing) + ".")
     latest = Constitution.objects.select_for_update().filter(group_id=group_id).order_by("-version").first()
     version = latest.version + 1 if latest else 1
     c = Constitution.objects.create(group_id=group_id, version=version, rules=parsed.to_dict(), adopted_by=actor)

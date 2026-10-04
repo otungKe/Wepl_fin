@@ -2,8 +2,9 @@
 from django.db import transaction
 
 from contexts.audit.public import operation, record
-from contexts.communities.public import group_view, members
+from contexts.communities.public import funds, group_view, members
 from contexts.governance.public import execute_mandate, find_by_reference, issued_for_amount, mandate
+from contexts.ledger.public import cash_by_fund
 from contexts.notifications.public import notify
 
 from ..contract import CustodyError, IngestResult
@@ -11,6 +12,7 @@ from ..domain import accounting
 from ..domain.attribution import MemberFacts, attribute
 from ..domain.matching import match_outflow, quoted_references
 from ..domain.resolution import Outcome
+from ..domain.routing import fund_for, split_across_funds
 from ..domain.sharing import Event
 from ..domain.statement import BankLine, LineKind
 from ..infrastructure.models import Alert, ExternalAccount, PayerMapping, StatementLine
@@ -72,13 +74,18 @@ def account_for(ea: ExternalAccount, line: StatementLine) -> None:
     handler(ea, line)
 
 
+def fund_codes(group_id: int) -> dict[str, int]:
+    return {f.code: f.id for f in funds(group_id) if f.code}
+
+
 def _deposit(ea, line):
+    fund_id, reference = fund_for(line.reference, fund_codes(ea.group_id), ea.fund_id)  # ADR-0023
     group_members = members(ea.group_id, active_only=False)  # ended spells too: their codes stay theirs
     remembered = dict(PayerMapping.objects.filter(group_id=ea.group_id).values_list("msisdn", "membership_id"))
-    member_id = attribute(reference=line.reference, narration=line.narration, payer_msisdn=line.counterparty_msisdn,
+    member_id = attribute(reference=reference, narration=line.narration, payer_msisdn=line.counterparty_msisdn,
                           members=[MemberFacts(m.id, m.code, m.msisdn, m.is_active) for m in group_members],
                           remembered_payers=remembered)
-    draft = accounting.receipt(bk.book(ea), key=f"line:{line.pk}:receipt", line_id=line.pk, amount=bk.amount(line),
+    draft = accounting.receipt(bk.book(ea, fund_id), key=f"line:{line.pk}:receipt", line_id=line.pk, amount=bk.amount(line),
                                member_id=member_id)
     if member_id:
         bk.post_and_resolve(line, draft, Outcome.ATTRIBUTED, membership_id=member_id)
@@ -95,34 +102,44 @@ def _deposit(ea, line):
 
 
 def _interest(ea, line):
-    ids, balances = bk.sharing_facts(ea, at=line.posted_at, event=Event.RETURNS)
-    draft = accounting.interest(bk.book(ea), key=f"line:{line.pk}:interest", line_id=line.pk, amount=bk.amount(line),
-                                rule=bk.rules(ea).interest, member_ids=ids, balances=balances)
-    bk.post_and_resolve(line, draft, Outcome.INTEREST)
+    _returns(ea, line, accounting.interest, "interest", bk.rules(ea).interest, Outcome.INTEREST)
 
 
 def _charge(ea, line):
-    ids, balances = bk.sharing_facts(ea, at=line.posted_at, event=Event.RETURNS)
-    draft = accounting.charge(bk.book(ea), key=f"line:{line.pk}:charge", line_id=line.pk, amount=bk.amount(line),
-                              rule=bk.rules(ea).bank_charges, member_ids=ids, balances=balances)
-    bk.post_and_resolve(line, draft, Outcome.CHARGE)
+    _returns(ea, line, accounting.charge, "charge", bk.rules(ea).bank_charges, Outcome.CHARGE)
+
+
+def _returns(ea, line, decide, name, rule, outcome):
+    """Interest or a charge on the account: split among the funds held there
+    as the group chose (ADR-0023), then inside each fund as its rule says.
+    One entry and one resolution per fund, all in this line's transaction."""
+    parts = split_across_funds(bk.amount(line), cash_by_fund(ea.pk, ea.currency), bk.rules(ea).account_split,
+                               ea.fund_id)
+    for fund_id, part in sorted(parts.items()):
+        ids, balances = bk.sharing_facts(ea, fund_id, at=line.posted_at, event=Event.RETURNS)
+        key = f"line:{line.pk}:{name}" if fund_id == ea.fund_id else f"line:{line.pk}:{name}:fund:{fund_id}"
+        draft = decide(bk.book(ea, fund_id), key=key, line_id=line.pk, amount=part, rule=rule, member_ids=ids,
+                       balances=balances)
+        bk.post_and_resolve(line, draft, outcome)
 
 
 def _withdrawal(ea, line):
     amount = bk.amount(line)
     quoted = quoted_references(line.narration, line.reference)
     match = match_outflow(amount=amount, payee_msisdn=line.counterparty_msisdn, quoted=quoted,
-                          referenced=find_by_reference(ea.fund_id, quoted) if quoted else None,
-                          candidates=[] if quoted else issued_for_amount(ea.fund_id, amount))
+                          referenced=find_by_reference(ea.group_id, quoted) if quoted else None,
+                          candidates=[] if quoted else issued_for_amount(ea.group_id, amount))
     if match.mandate_id and execute_mandate(match.mandate_id, line_id=line.pk, when=line.posted_at):
         m = mandate(match.mandate_id)
-        ids, balances = bk.sharing_facts(ea, at=line.posted_at, event=Event.PAYOUT)
-        draft = accounting.authorised_payout(bk.book(ea), key=f"line:{line.pk}:payout", line_id=line.pk, amount=amount,
+        # the mandate names the fund it spends (ADR-0023)
+        ids, balances = bk.sharing_facts(ea, m.fund_id, at=line.posted_at, event=Event.PAYOUT, approved_at=m.issued_at)
+        draft = accounting.authorised_payout(bk.book(ea, m.fund_id), key=f"line:{line.pk}:payout", line_id=line.pk, amount=amount,
                                              allocation=m.allocation, charged_member_id=m.charged_member_id,
                                              member_ids=ids, balances=balances, reference=m.reference)
         bk.post_and_resolve(line, draft, Outcome.MATCHED, mandate_id=m.id, note=match.reason)
         return
     reason = match.reason if not match.mandate_id else "The mandate was already used."
+    # held in the default fund until someone explains it; which fund it spent is unknown
     draft = accounting.unexplained_payout(bk.book(ea), key=f"line:{line.pk}:payout", line_id=line.pk, amount=amount)
     bk.post_and_resolve(line, draft, Outcome.UNMATCHED, note=reason)
     alert = Alert.objects.create(

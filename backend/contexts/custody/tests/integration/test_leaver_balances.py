@@ -45,11 +45,27 @@ class LeaverBalanceTests(TestCase):
         self.returns()
         self.assert_balances("1018", "1018")
 
-    def test_a_leaver_never_shares_a_payout_made_after_they_left(self):
+    def test_a_leaver_never_shares_a_payout_made_after_they_left_when_the_group_says_never(self):
         self.start(UNTIL_PAID)
         bank.withdraw(N, "400", narration=self.s.approve("400"))
         self.s.sync()
         self.assert_balances("1000", "900")
+
+    def test_a_payout_approved_before_they_left_reaches_them_if_the_group_says_so(self):
+        self.s = Scenario(rules={**UNTIL_PAID, "leaver_payouts": "approved_before_leaving"})
+        self.enterContext(self.s.acting())
+        for m in self.s.m:
+            bank.deposit(N, "1000", msisdn=m.msisdn, name="X")
+        self.s.sync()
+        ref = self.s.approve("500")  # approved while Kiprono is a member
+        self.leaver = self.s.m[3]
+        self.stayers = [m for m in self.s.m if m is not self.leaver]
+        leave_group(self.leaver.id, actor="test")
+        bank.withdraw(N, "500", narration=ref)
+        later = self.s.approve("400")  # approved after he left
+        bank.withdraw(N, "400", narration=later)
+        self.s.sync()
+        self.assert_balances("900", "800")
 
     def test_once_paid_out_a_leaver_stops_sharing(self):
         self.start(UNTIL_PAID)
@@ -57,6 +73,12 @@ class LeaverBalanceTests(TestCase):
         self.s.sync()
         self.returns()
         self.assert_balances("0", "1022.50")
+
+    def test_the_group_may_choose_that_a_new_version_reaches_earlier_leavers(self):
+        self.start({**FROZEN, "leaver_rule_version": "current"})
+        adopt_constitution(self.s.group.id, {**UNTIL_PAID, "leaver_rule_version": "current"}, actor="test")
+        self.returns()
+        self.assert_balances("1018", "1018")
 
     def test_the_rule_in_force_on_the_day_they_left_applies(self):
         self.start(UNTIL_PAID)

@@ -30,6 +30,9 @@ class Fund(models.Model):
     group = models.ForeignKey(Group, on_delete=models.PROTECT, related_name="funds")
     name = models.CharField(max_length=80)
     currency = models.CharField(max_length=3, default="KES")
+    # What members add to a pay-in reference to send money to this fund
+    # rather than the group's default fund (ADR-0023). Optional.
+    code = models.CharField(max_length=6, null=True, blank=True)
     status = models.CharField(max_length=10, choices=[(s.value, s.value) for s in FundStatus],
                               default=FundStatus.OPEN.value, db_default=FundStatus.OPEN.value)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -41,6 +44,11 @@ class Fund(models.Model):
             models.UniqueConstraint("group", Lower("name"), condition=Q(status="open"),
                                     name="community_open_fund_name_any_case"),
             models.CheckConstraint(condition=Q(currency__in=CURRENCIES), name="community_fund_currency"),
+            # one meaning per code among the group's open funds; a closed fund's code is free again
+            models.UniqueConstraint("group", "code", condition=Q(status="open", code__isnull=False),
+                                    name="community_open_fund_code"),
+            models.CheckConstraint(condition=Q(code__isnull=True) | Q(code__regex=r"^[A-Z]{2,6}$"),
+                                   name="community_fund_code_letters"),
         ]
 
 

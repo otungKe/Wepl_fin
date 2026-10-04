@@ -30,21 +30,29 @@ the questions still open with the bank.
      decides and posts.
 3. **account_for.** It is skipped if the line already has a resolution. It
    then dispatches by kind:
+   - **which fund.** One account holds all the group's funds (ADR-0023).
+     A deposit goes to the fund whose code is in the reference
+     (`domain/routing.fund_for`), else the default fund
+     (`ExternalAccount.fund`). A withdrawal goes to its mandate's fund;
+     an unmatched one to the default fund.
    - **deposit.** `domain/attribution.attribute` looks for a member code in the
      reference or narration, then a remembered payer (`PayerMapping`), then
      the member's own number. Otherwise the money goes to `unattributed_in`
      and a `correct_records` holder is asked once. A code quoted from a membership spell that ended is held, never moved to another spell (ADR-0012).
-   - **interest / charge.** Shared pro rata by member balances, or retained,
-     per the constitution (`ConstitutionRules.interest` / `bank_charges`).
+   - **interest / charge.** Split across funds as the group chose
+     (`account_returns`: `default_fund` or `by_fund_balance`), one entry per
+     fund; inside each fund shared pro rata by member balances, or retained
+     (`ConstitutionRules.interest` / `bank_charges`).
    - **withdrawal.** `domain/matching.match_outflow`:
-     - A quoted `WM…` reference must name an issued mandate in this fund for
+     - A quoted `WM…` reference must name an issued mandate of this group for
        exactly this amount.
      - With no reference, it must be the *single* issued mandate with this
        amount, and this payee when the bank reports one.
      - The claim is `governance.public.execute_mandate`, a conditional UPDATE.
      - No match: `unexplained_out`, an `unmatched_outflow` alert, and an alert
        notification to **every** active member.
-4. **reconcile.** It compares ledger `custody_cash` with the latest running
+4. **reconcile.** It compares ledger `custody_cash`, summed over every fund
+   held at the account (`account_position`), with the latest running
    balance, finds sequence gaps and unresolved lines, and records a
    `ReconciliationRun`. It also walks the running balance line by line
    (`balance_breaks`): each printed balance must equal the one before plus or
@@ -70,7 +78,9 @@ reconciles; the alert is the control, not the reconciliation.
   line, with sequence 0. Anything the signers cannot account for goes to
   `unattributed_in`, never to a member.
 - **Group checks everywhere.** Every correction checks that the member or
-  mandate belongs to the line's group and fund.
+  mandate belongs to the line's group. A correction posts in the fund the
+  line went to (`bookkeeping.line_fund`); a mandate of another fund moves
+  the outflow there in two entries (ADR-0023).
 
 ## The simulator and the demo
 
@@ -98,9 +108,10 @@ reconciles; the alert is the control, not the reconciliation.
 ## Sharing and leavers (ADR-0014)
 
 - `domain/sharing.py` decides who shares an event, judged on the line's
-  `posted_at`: members in the group that day; leavers only for interest and
-  charges, only under `shares_until_paid` as in force when they left, and
-  only while their balance is above zero; never a payout after leaving.
+  `posted_at`: members in the group that day; leavers only as the group's
+  own constitution choices say (`leaver_balances`, `leaver_rule_version`,
+  `leaver_payouts`; no defaults). Never invent a leaver rule: add a group
+  choice instead.
 
 ## Do not assume
 

@@ -8,7 +8,7 @@ from contexts.shared_kernel.money import Money
 from ..domain.accounts import AccountKey, AccountPurpose, Side
 from ..domain.position import FundPosition
 from ..infrastructure import accounts
-from ..infrastructure.models import JournalLine
+from ..infrastructure.models import JournalEntry, JournalLine
 
 _DEC = DecimalField(max_digits=18, decimal_places=2)
 _SIGNED = Sum(Case(When(side=F("account__normal_side"), then=F("amount")), default=-F("amount"), output_field=_DEC))
@@ -18,6 +18,20 @@ def account_balance(key: AccountKey) -> Money:
     acct = accounts.find(key)
     total = JournalLine.objects.filter(account=acct).aggregate(v=_SIGNED)["v"] if acct else None
     return Money(total or 0, key.currency)
+
+
+def cash_by_fund(external_account_id: int, currency: str = "KES") -> dict[int, Money]:
+    """What each fund holds at one custodian account. A group's funds may
+    share its one bank account (ADR-0023); the account's balance is the sum."""
+    rows = (JournalLine.objects.filter(account__external_account_id=external_account_id,
+                                       account__purpose=AccountPurpose.CUSTODY_CASH, account__currency=currency)
+            .values("account__fund_id").annotate(v=_SIGNED))
+    return {r["account__fund_id"]: Money(r["v"] or 0, currency) for r in rows}
+
+
+def entry_fund(entry_id: int) -> int:
+    """The fund whose books a journal entry is in."""
+    return JournalEntry.objects.values_list("fund_id", flat=True).get(pk=entry_id)
 
 
 def member_balances(fund_id: int, currency: str = "KES") -> dict[int, Money]:

@@ -1,13 +1,8 @@
 # ADR-0014: Treatment of outstanding balances after membership ends
 
-- **Status:** **Direction decided; built on recommended details that
-  Harry has not yet confirmed.**
-  - Harry decided (2026-09-30) that each group chooses, in its constitution
-    at onboarding, between `SHARES_UNTIL_PAID` and `FROZEN_AT_LEAVING`, with
-    no universal behaviour.
-  - Built 2026-10-04 on the three details recommended to Harry on
-    2026-10-04 (see "Details built" below). If he answers differently, the
-    rule changes in one place: `custody/domain/sharing.py`.
+- **Status:** **Decided by Harry: every leaver rule is the group's own
+  choice** (2026-09-30 for the balance rule; 2026-10-04 for the rest: "All
+  those should be a group decision"). Built.
   - The model is in
     [the design](../architecture/design-leaver-balance-policy.md). Raised by
     the membership review (2026-09-30); see
@@ -33,23 +28,32 @@
   - a member in the group that day shares interest, bank charges and
     pro-rata payouts;
   - a member who joined after the event shares nothing from it;
-  - a leaver shares interest and charges only if the rule in force on the
-    day they left was `SHARES_UNTIL_PAID` and their balance is still above
-    zero;
-  - a leaver never shares a pro-rata payout made after they left.
+  - a leaver shares interest and charges only under `shares_until_paid`
+    and while their balance is above zero;
+  - a leaver bears a pro-rata payout made after they left only as
+    `leaver_payouts` says.
 - Tests: `custody/tests/unit/test_sharing.py`,
   `custody/tests/integration/test_leaver_balances.py`.
 
-## Details built (recommended, awaiting Harry's confirmation)
+## The group's choices (each required in its constitution; no default)
 
-1. **Which version of the rule:** the one in force on the day the member
-   left. A later change does not reach back to earlier leavers.
-2. **"Paid out" means the balance reaches zero.** A leaver with nothing
-   left stops sharing.
-3. **Group spending after leaving:** a leaver is excluded from every
-   pro-rata payout dated after they left. (Simplification: the payout's
-   date is used, not the date it was approved. A payout approved before
-   they left but paid after does not reach them.)
+| Setting | Values | Meaning |
+|---|---|---|
+| `leaver_balances` | `shares_until_paid`, `frozen_at_leaving` | Whether a leaver's unpaid balance keeps sharing interest and bank charges |
+| `leaver_rule_version` | `at_leaving`, `current` | When the group adopts a new constitution: does a leaver keep the version in force on the day they left, or follow the one in force at each event? |
+| `leaver_payouts` | `never`, `approved_before_leaving`, `always` | Whether a leaver bears a pro-rata share of a payout made after they left. `approved_before_leaving` uses the mandate's issue time (when the group's approval completed). |
+
+- Changing any of them is a new constitution version, adopted under the
+  group's own rules.
+- **"Paid out" is not a setting.** Sharing is pro-rata by balance, so a
+  balance of zero takes no share of anything. A settlement the officials
+  record by hand, without the money reaching zero, does not exist yet.
+- Constitution versions adopted before these settings existed read as
+  `frozen_at_leaving`, `at_leaving` and `never`: what the software did
+  while they were in force.
+- **For reference, the original WEPL** paid any declared surplus to every
+  member with a positive balance, so an unpaid leaver kept sharing. A leaver
+  was paid out by a voted exit request, net of any advance they still owed.
 
 ## Options put to Harry
 

@@ -7,11 +7,12 @@ from contexts.shared_kernel.money import Money
 from .domain.capabilities import Capability
 from .domain.lifecycle import InvalidTransition, MandateStatus, ProposalStatus
 from .domain.mandate import MANDATE_REFERENCE, Allocation
-from .domain.rules import ConstitutionRules, LeaverBalances, RulesError, SharingRule
+from .domain.rules import (AccountReturns, ConstitutionRules, LeaverBalances, LeaverPayouts, LeaverRuleVersion, RulesError,
+                           SharingRule)
 
 __all__ = ["Allocation", "Capability", "ConstitutionRules", "GovernanceError", "InvalidTransition", "MANDATE_REFERENCE",
            "MandateStatus", "MandateView", "ProposalStatus", "ProposalView", "RulesError", "SharingRule",
-           "LeaverBalances"]
+           "AccountReturns", "LeaverBalances", "LeaverPayouts", "LeaverRuleVersion"]
 
 
 class GovernanceError(ValueError):
@@ -31,6 +32,7 @@ class MandateView:
     charged_member_id: int | None
     status: MandateStatus
     expires_at: datetime
+    issued_at: datetime | None = None  # when the group's approval completed
 
 
 @dataclass(frozen=True)

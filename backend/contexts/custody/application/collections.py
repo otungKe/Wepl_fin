@@ -15,8 +15,9 @@ from contexts.tenancy.public import cross_tenant, tenant
 
 from ..contract import IngestResult
 from ..domain.attribution import quoted_msisdn
+from ..domain.routing import fund_for, unknown_words
 from ..infrastructure.models import ExternalAccount
-from .ingestion import ingest
+from .ingestion import fund_codes, ingest
 
 CONNECTOR = "business_connect"
 
@@ -30,13 +31,18 @@ class ReferenceCheck:
 
 def check_reference(account_number: str, reference: str) -> ReferenceCheck:
     """Does this reference name a current member of the group whose account
-    it is: their mobile number or their member code? Read-only."""
+    it is: their mobile number or their member code, with or without one of
+    the group's fund codes (ADR-0023)? Read-only."""
     found = _account(account_number)
     if found is None:
         return ReferenceCheck(False, reason="No WEPL group collects into that account.")
     ea_id, tenant_id = found
     with tenant(tenant_id):
         ea = ExternalAccount.objects.get(pk=ea_id)
+        codes = fund_codes(ea.group_id)
+        if unknown := unknown_words(reference, codes):
+            return ReferenceCheck(False, reason=f"{unknown[0]} is not the code of one of this group's funds.")
+        reference = fund_for(reference, codes, ea.fund_id)[1]
         current = members(ea.group_id)
         number = quoted_msisdn(reference)
         named = [m for m in current if m.msisdn == number] if number else \

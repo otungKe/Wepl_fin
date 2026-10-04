@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 from unittest import TestCase
 
 from contexts.custody.domain.sharing import Event, Spell, sharers
-from contexts.governance.contract import LeaverBalances
+from contexts.governance.contract import LeaverBalances, LeaverPayouts
 from contexts.shared_kernel.money import Money
 
 T = datetime(2026, 10, 1, tzinfo=timezone.utc)
@@ -34,3 +34,16 @@ class SharersTests(TestCase):
         spell = [Spell(1, T - 2 * DAY, T - DAY, PAID)]
         for balance in ({1: Money("0")}, {1: Money("-5")}, {}):
             self.assertEqual(sharers(spell, at=T, event=Event.RETURNS, balances=balance), [])
+
+    def test_a_leaver_bears_a_payout_only_as_the_group_chose(self):
+        def leaver(payouts):
+            return [Spell(1, T - 3 * DAY, T - DAY, FROZEN, payouts)]
+        before, after = T - 2 * DAY, T - DAY / 2
+        for payouts, approved_at, expected in ((LeaverPayouts.NEVER, before, []),
+                                               (LeaverPayouts.APPROVED_BEFORE_LEAVING, before, [1]),
+                                               (LeaverPayouts.APPROVED_BEFORE_LEAVING, after, []),
+                                               (LeaverPayouts.APPROVED_BEFORE_LEAVING, None, []),
+                                               (LeaverPayouts.ALWAYS, after, [1]), (None, before, [])):
+            with self.subTest(payouts=payouts, approved_at=approved_at):
+                self.assertEqual(sharers(leaver(payouts), at=T, event=Event.PAYOUT, balances={},
+                                         approved_at=approved_at), expected)
