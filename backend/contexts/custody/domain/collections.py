@@ -9,29 +9,34 @@ import re
 from dataclasses import dataclass
 from enum import StrEnum
 
+from contexts.identity.contract import Msisdn
+
 from .statement import LineKind
 
 PAYMENT_CODE_LENGTH = 5
-_MEMBER_CODE = re.compile(r"M\d+")
 
 
 @dataclass(frozen=True)
 class PaymentReference:
+    """The group's 5-digit payment code, then the member's own mobile number
+    (Harry, 2026-10-04): ``55555#0712597024``."""
     group_code: str
-    member_code: str
+    msisdn: str  # normalised, 2547XXXXXXXX
 
     def __str__(self):
-        return f"{self.group_code}-{self.member_code}"
+        return f"{self.group_code}#0{self.msisdn[3:]}"
 
 
 def parse_reference(text: str) -> PaymentReference | None:
-    """``K7QAP-M01``, ``k7qap m01`` and ``K7QAPM01`` all read the same:
-    separators and case are ignored, because payers retype references."""
-    compact = re.sub(r"[^A-Z0-9]", "", (text or "").upper())
-    group, member = compact[:PAYMENT_CODE_LENGTH], compact[PAYMENT_CODE_LENGTH:]
-    if len(group) < PAYMENT_CODE_LENGTH or not _MEMBER_CODE.fullmatch(member):
+    """``55555#0712597024``, ``55555 0712 597 024``, ``555550712597024`` and
+    ``55555#254712597024`` all read the same: only digits count, because
+    payers retype references and some channels may not accept ``#``. The
+    code is always five digits, so no separator is needed to split it."""
+    digits = re.sub(r"\D", "", text or "")
+    group, phone = digits[:PAYMENT_CODE_LENGTH], Msisdn.try_parse(digits[PAYMENT_CODE_LENGTH:])
+    if len(group) < PAYMENT_CODE_LENGTH or phone is None:
         return None
-    return PaymentReference(group, member)
+    return PaymentReference(group, phone.value)
 
 
 class RouteKind(StrEnum):
@@ -44,7 +49,7 @@ class RouteKind(StrEnum):
 class Route:
     kind: RouteKind
     key: str = ""         # the payment code or the mandate reference
-    member_code: str = ""
+    msisdn: str = ""      # the member the payer named, by their mobile number
     reason: str = ""
 
 
@@ -55,8 +60,8 @@ def route(*, kind: LineKind, reference: str, quoted_mandates: tuple[str, ...]) -
         # before taking the money. Codes found in free text would be a guess.
         ref = parse_reference(reference)
         if ref is None:
-            return Route(RouteKind.HOLD, reason="The payment's reference is not a group payment code and member code.")
-        return Route(RouteKind.BY_PAYMENT_CODE, key=ref.group_code, member_code=ref.member_code)
+            return Route(RouteKind.HOLD, reason="The payment's reference is not a group payment code and a mobile number.")
+        return Route(RouteKind.BY_PAYMENT_CODE, key=ref.group_code, msisdn=ref.msisdn)
     if kind == LineKind.WITHDRAWAL:
         if len(set(quoted_mandates)) == 1:
             return Route(RouteKind.BY_MANDATE, key=quoted_mandates[0])

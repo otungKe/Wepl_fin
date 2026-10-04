@@ -85,8 +85,8 @@ def check_reference(account_number: str, reference: str) -> ReferenceCheck:
         group = group_for_payment_code(ref.group_code) if pool else None
         if group is None or not ExternalAccount.objects.filter(pooled_in=pool, group_id=group.id).exists():
             return ReferenceCheck(False, reason="No group collects here with that payment code.")
-        if not any(m.code == ref.member_code for m in members(group.id)):
-            return ReferenceCheck(False, reason="No current member of the group has that member code.")
+        if _member_code(group.id, ref.msisdn) is None:
+            return ReferenceCheck(False, reason="That mobile number is not a current member of the group.")
         return ReferenceCheck(True, group_name=group.name)
 
 
@@ -156,14 +156,20 @@ def _record_and_route(pool: CollectionAccount, bl: BankLine, result: CollectionR
         sub_sequence=previous[0] + 1, sub_balance=previous[1] + signed(c.kind, c.amount),
         reason=f"{decision.kind.value} {decision.key}")
     result.routed += 1
-    return _delivery(c, r, member_code=decision.member_code)
+    return _delivery(c, r, member_code=(_member_code(ea.group_id, decision.msisdn) or "") if decision.msisdn else "")
 
 
 def _sub_account(pool: CollectionAccount, decision) -> tuple[ExternalAccount | None, str]:
     if decision.kind == RouteKind.BY_PAYMENT_CODE:
+        # Both halves must agree: a mistyped code that happens to be another
+        # group's is held, not paid into a stranger's group.
         group = group_for_payment_code(decision.key)
         ea = ExternalAccount.objects.filter(pooled_in=pool, group_id=group.id).first() if group else None
-        return ea, "" if ea else f"No group collects here with payment code {decision.key}."
+        if ea is None:
+            return None, f"No group collects here with payment code {decision.key}."
+        if _member_code(group.id, decision.msisdn) is None:
+            return None, f"The number in the reference is not a current member of group {decision.key}."
+        return ea, ""
     if decision.kind == RouteKind.BY_MANDATE:
         found = mandates_by_reference([decision.key])
         ea = ExternalAccount.objects.filter(pooled_in=pool, fund_id=found[0].fund_id).first() if found else None
@@ -173,13 +179,23 @@ def _sub_account(pool: CollectionAccount, decision) -> tuple[ExternalAccount | N
 
 def _redelivery(c: Collection):
     r = c.routings.filter(outcome="routed").first()
-    return _delivery(c, r, member_code=parse_reference(c.reference).member_code
-                     if c.kind == LineKind.DEPOSIT and parse_reference(c.reference) else "") if r else None
+    if r is None:
+        return None
+    ref = parse_reference(c.reference) if c.kind == LineKind.DEPOSIT else None
+    ea = ExternalAccount.objects.get(pk=r.external_account_id)
+    return _delivery(c, r, member_code=(_member_code(ea.group_id, ref.msisdn) or "") if ref else "")
+
+
+def _member_code(group_id: int, msisdn: str) -> str | None:
+    """The code of the group's current member with this mobile number. The
+    number names a person; their current spell in this group is the one
+    paid for (ADR-0012), so an ended spell never receives new money."""
+    return next((m.code for m in members(group_id) if m.msisdn == msisdn), None)
 
 
 def _delivery(c: Collection, r: CollectionRouting, *, member_code: str):
     """The line as the group's sub-account sees it: its own numbering and
-    balance, and for a pay-in the member code alone as the reference, so
+    balance, and for a pay-in the named member's code as the reference, so
     attribution reads it as it reads any statement."""
     line = BankLine(external_id=c.external_id, sequence=r.sub_sequence, posted_at=c.posted_at, kind=LineKind(c.kind),
                     amount=c.amount, narration=c.narration, reference=member_code or c.reference,

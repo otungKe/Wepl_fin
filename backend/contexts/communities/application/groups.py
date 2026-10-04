@@ -30,13 +30,13 @@ def create_group(name: str, *, actor: str) -> GroupView:
 
 
 def _found(name: str) -> Group:
-    """The database draws the payment code. Two groups drawing the same one
-    (1 in 33.5 million) is refused by its unique key; draw again."""
-    for attempt in range(5):
+    """The database draws the payment code from 90,000. A clash with an
+    existing group is refused by its unique key; draw again."""
+    for attempt in range(20):
         try:
             with transaction.atomic():
                 return Group.objects.create(name=name)
         except IntegrityError as exc:
-            if "payment_code" not in str(exc) or attempt == 4:
+            if "payment_code" not in str(exc) or attempt == 19:
                 raise
     raise AssertionError("unreachable")

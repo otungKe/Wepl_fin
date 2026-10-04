@@ -21,7 +21,7 @@ def group_for_payment_code(code: str) -> GroupView | None:
     """The group whose payment code this is, or None. Only finds groups the
     caller can see: its own inside a tenant, any in a declared cross-tenant
     operation (ADR-0018 routing)."""
-    g = Group.objects.filter(payment_code=code.upper()).first()
+    g = Group.objects.filter(payment_code=code.strip()).first()
     return _group(g) if g else None
 
 

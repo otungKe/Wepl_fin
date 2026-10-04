@@ -18,9 +18,9 @@ class Group(models.Model):
     # The last member sequence handed out. Only ever increases (0006), so a
     # member code is never allocated twice, whatever happens to memberships.
     last_member_sequence = models.PositiveIntegerField(default=0, db_default=0)
-    # What members quote, before their member code, when paying into a pooled
-    # collection account (ADR-0018). Drawn by the database at founding, never
-    # changed (0014), unique across WEPL.
+    # Five digits members quote, before their own mobile number, when paying
+    # into the pooled collection account (ADR-0018): 55555#0712597024. Drawn
+    # by the database at founding, never changed (0014, 0015), unique.
     payment_code = models.CharField(max_length=5, unique=True, editable=False,
                                     db_default=models.Func(function="communities_new_payment_code",
                                                            output_field=models.CharField()))

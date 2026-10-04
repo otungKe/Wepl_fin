@@ -43,11 +43,20 @@
    - The fund's books, statement lines, attribution, mandates and per-fund
      reconciliation are unchanged; one fund per group per collection
      account.
-2. **The payment reference is the group's payment code + the member code**
-   (e.g. `K7QAP-M01`; separators ignored).
-   - Every group gets a 5-character payment code: unique, random, from the
-     mandate alphabet (no 0/O, 1/I).
-   - Member codes stay per group.
+2. **The payment reference is the group's payment code, then the member's
+   own mobile number** (Harry, 2026-10-04): `55555#0712597024`.
+   - The code is 5 digits (10000–99999), so the whole reference can be
+     typed on a phone keypad. It is random, unique, drawn by the database at
+     founding, and never changes.
+   - Only digits count: `#`, spaces and `+254` are ignored, in case a
+     channel does not accept `#`.
+   - The number names the person; their current spell in that group is the
+     member paid for (ADR-0012).
+   - Both halves must agree. A code whose group has no current member with
+     that number is held, so a mistyped code that happens to be another
+     group's never pays a stranger's group.
+   - Capacity: 90,000 groups per code length; widening it later needs an
+     ADR.
 3. **Every bank transaction is recorded once, as platform data, then routed
    to exactly one tenant.**
    - `Collection` holds the bank's fact, append-only and unique by the

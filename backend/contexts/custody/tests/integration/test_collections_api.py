@@ -20,7 +20,7 @@ class CollectionsApiTests(TestCase):
                                 connector="collections_api", actor="ops")
         self.s = Scenario("Umoja", account=None)
         self.s.ea = collect_into(self.s.fund.id, account_number=POOL, actor="ops")
-        self.ref = f"{self.s.group.payment_code}-{self.s.m[0].code}"
+        self.ref = f"{self.s.group.payment_code}#0{self.s.m[0].msisdn[3:]}"
 
     def call(self, path, data, *, secret=SECRET, timestamp=None):
         body = json.dumps(data).encode()
@@ -36,7 +36,7 @@ class CollectionsApiTests(TestCase):
     def test_the_bank_checks_a_reference(self):
         ok = self.call("validate", {"reference": self.ref}).json()
         self.assertEqual((ok["accepted"], ok["name"]), (True, "Umoja"))
-        self.assertFalse(self.call("validate", {"reference": "ZZZZZ-M01"}).json()["accepted"])
+        self.assertFalse(self.call("validate", {"reference": "00000#0712000001"}).json()["accepted"])
 
     def test_a_notified_payment_is_booked_once(self):
         first = self.call("notify", self.payment())

@@ -1,12 +1,11 @@
 from django.db import migrations, models
 
-# Five characters from the mandate alphabet (no 0/O, 1/I), so a code survives
-# being read out and retyped: 32^5 = 33.5 million codes. A collision is
-# refused by the unique key and founding draws again.
+# Five digits, 10000-99999 (90,000 codes), so the whole reference
+# ("55555#0712597024", Harry 2026-10-04) can be typed on any phone keypad. A
+# collision is refused by the unique key and founding draws again.
 NEW_PAYMENT_CODE = """
 CREATE FUNCTION communities_new_payment_code() RETURNS varchar LANGUAGE sql VOLATILE AS $$
-    SELECT string_agg(substr('ABCDEFGHJKLMNPQRSTUVWXYZ23456789', 1 + floor(random() * 32)::int, 1), '')
-    FROM generate_series(1, 5)
+    SELECT (10000 + floor(random() * 90000))::int::varchar
 $$;
 """
 
@@ -32,6 +31,9 @@ class Migration(migrations.Migration):
             field=models.CharField(db_default=models.Func(function="communities_new_payment_code",
                                                           output_field=models.CharField()),
                                    editable=False, max_length=5, unique=True)),
+        migrations.RunSQL("ALTER TABLE communities_group ADD CONSTRAINT communities_payment_code_digits "
+                          "CHECK (payment_code ~ '^[1-9][0-9]{4}$');",
+                          "ALTER TABLE communities_group DROP CONSTRAINT IF EXISTS communities_payment_code_digits;"),
         migrations.RunSQL(CODE_NEVER_CHANGES, """
             DROP TRIGGER IF EXISTS communities_payment_code_fixed ON communities_group;
             DROP FUNCTION IF EXISTS communities_payment_code_fixed();"""),
