@@ -30,7 +30,7 @@ def create_group(name: str, *, actor: str) -> GroupView:
 
 
 def _found(name: str) -> Group:
-    """The database draws the payment code from 90,000. A clash with an
+    """The database draws the payment code from 900,000. A clash with an
     existing group is refused by its unique key; draw again."""
     for attempt in range(20):
         try:

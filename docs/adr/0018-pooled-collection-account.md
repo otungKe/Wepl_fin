@@ -44,19 +44,27 @@
      reconciliation are unchanged; one fund per group per collection
      account.
 2. **The payment reference is the group's payment code, then the member's
-   own mobile number** (Harry, 2026-10-04): `55555#0712597024`.
-   - The code is 5 digits (10000–99999), so the whole reference can be
-     typed on a phone keypad. It is random, unique, drawn by the database at
-     founding, and never changes.
-   - Only digits count: `#`, spaces and `+254` are ignored, in case a
-     channel does not accept `#`.
-   - The number names the person; their current spell in that group is the
-     member paid for (ADR-0012).
-   - Both halves must agree. A code whose group has no current member with
-     that number is held, so a mistyped code that happens to be another
-     group's never pays a stranger's group.
-   - Capacity: 90,000 groups per code length; widening it later needs an
-     ADR.
+   own mobile number** (Harry, 2026-10-04): `1234566 0712597024`.
+   - **The code has a fixed length of 7 digits:** 6 random digits
+     (100000–999999), then a Damm check digit.
+     - It is unique, drawn by the database at founding, and never changes.
+     - Harry suggested 5 to 10 digits. A variable length was rejected: with
+       separators optional, `1234 0712597024` and `12340 712597024` are the
+       same digits.
+   - **The check digit** catches every single mistyped digit and every swap
+     of two neighbouring digits. Such a code names no group, so the bank's
+     reference check refuses it before it takes the money.
+   - **Only digits count.** `#`, spaces and `+254` are ignored, because `#`
+     may submit a USSD entry and payers retype references.
+   - **The number names the person.** Their current spell in that group is
+     the member paid for (ADR-0012). Each number belongs to one person.
+   - **Both halves must agree.** A pay-in is held if its code's group has no
+     current member with that number.
+   - **Capacity:** 900,000 groups. Changing the length needs an ADR.
+   - **Open with the bank:** the longest reference each channel accepts
+     (this one is 17 digits), and whether the payer's phone arrives masked.
+     On an STK push, WEPL starts the payment and can use a shorter
+     reference of its own.
 3. **Every bank transaction is recorded once, as platform data, then routed
    to exactly one tenant.**
    - `Collection` holds the bank's fact, append-only and unique by the

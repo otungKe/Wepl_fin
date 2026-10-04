@@ -18,10 +18,11 @@ class Group(models.Model):
     # The last member sequence handed out. Only ever increases (0006), so a
     # member code is never allocated twice, whatever happens to memberships.
     last_member_sequence = models.PositiveIntegerField(default=0, db_default=0)
-    # Five digits members quote, before their own mobile number, when paying
-    # into the pooled collection account (ADR-0018): 55555#0712597024. Drawn
-    # by the database at founding, never changed (0014, 0015), unique.
-    payment_code = models.CharField(max_length=5, unique=True, editable=False,
+    # Seven digits members quote, before their own mobile number, when paying
+    # into the pooled collection account (ADR-0018): 1234566 0712597024. Six
+    # random digits and a check digit, drawn by the database at founding,
+    # never changed (0014), unique.
+    payment_code = models.CharField(max_length=7, unique=True, editable=False,
                                     db_default=models.Func(function="communities_new_payment_code",
                                                            output_field=models.CharField()))
     created_at = models.DateTimeField(auto_now_add=True)

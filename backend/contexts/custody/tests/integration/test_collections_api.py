@@ -36,7 +36,7 @@ class CollectionsApiTests(TestCase):
     def test_the_bank_checks_a_reference(self):
         ok = self.call("validate", {"reference": self.ref}).json()
         self.assertEqual((ok["accepted"], ok["name"]), (True, "Umoja"))
-        self.assertFalse(self.call("validate", {"reference": "00000#0712000001"}).json()["accepted"])
+        self.assertFalse(self.call("validate", {"reference": "0000000#0712000001"}).json()["accepted"])
 
     def test_a_notified_payment_is_booked_once(self):
         first = self.call("notify", self.payment())

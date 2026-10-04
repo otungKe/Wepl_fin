@@ -10,31 +10,33 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 from contexts.identity.contract import Msisdn
+from contexts.shared_kernel.check_digit import is_valid
 
 from .statement import LineKind
 
-PAYMENT_CODE_LENGTH = 5
+PAYMENT_CODE_LENGTH = 7  # six random digits and a check digit
 
 
 @dataclass(frozen=True)
 class PaymentReference:
-    """The group's 5-digit payment code, then the member's own mobile number
-    (Harry, 2026-10-04): ``55555#0712597024``."""
+    """The group's 7-digit payment code, then the member's own mobile number
+    (Harry, 2026-10-04): ``1234566 0712597024``."""
     group_code: str
     msisdn: str  # normalised, 2547XXXXXXXX
 
     def __str__(self):
-        return f"{self.group_code}#0{self.msisdn[3:]}"
+        return f"{self.group_code} 0{self.msisdn[3:]}"
 
 
 def parse_reference(text: str) -> PaymentReference | None:
-    """``55555#0712597024``, ``55555 0712 597 024``, ``555550712597024`` and
-    ``55555#254712597024`` all read the same: only digits count, because
-    payers retype references and some channels may not accept ``#``. The
-    code is always five digits, so no separator is needed to split it."""
+    """``1234566 0712597024``, ``1234566#0712 597 024``, ``12345660712597024``
+    and ``1234566 +254712597024`` all read the same: only digits count,
+    because payers retype references and ``#`` may submit a USSD entry. The
+    code always has seven digits, so no separator is needed to split it, and
+    a code whose check digit fails names no group at all."""
     digits = re.sub(r"\D", "", text or "")
     group, phone = digits[:PAYMENT_CODE_LENGTH], Msisdn.try_parse(digits[PAYMENT_CODE_LENGTH:])
-    if len(group) < PAYMENT_CODE_LENGTH or phone is None:
+    if len(group) < PAYMENT_CODE_LENGTH or not is_valid(group) or phone is None:
         return None
     return PaymentReference(group, phone.value)
 

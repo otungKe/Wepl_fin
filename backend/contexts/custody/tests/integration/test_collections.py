@@ -63,14 +63,14 @@ class PooledCollectionTests(TestCase):
         code = self.a.group.payment_code
         ok = check_reference(POOL, f"{code}#{local(self.a.m[0])}")
         self.assertEqual((ok.accepted, ok.group_name), (True, "Umoja"))
-        for wrong in (f"{code}#0799999999", f"00000#{local(self.a.m[0])}", f"{code}#12345", "hello", ""):
+        for wrong in (f"{code}#0799999999", f"{code[:-1]}{(int(code[-1]) + 1) % 10}#{local(self.a.m[0])}", f"0000000 {local(self.a.m[0])}", f"{code}#12345", "hello", ""):
             with self.subTest(wrong):
                 self.assertFalse(check_reference(POOL, wrong).accepted)
         self.assertFalse(check_reference("another account", f"{code}#{local(self.a.m[0])}").accepted)
 
     def test_money_nobody_can_be_named_for_is_held_never_guessed(self):
         self.pay(self.a, self.a.m[0], "1000")
-        self.pay(self.a, self.a.m[0], "70", reference=f"00000#{local(self.a.m[0])}")  # no such group
+        self.pay(self.a, self.a.m[0], "70", reference=f"0000000 {local(self.a.m[0])}")  # no such group
         self.pay(self.a, self.a.m[0], "30", reference="for the chama")
         self.pay(self.a, self.a.m[0], "20", reference=f"{self.a.group.payment_code}#0799999999")  # not a member
         bank.charge(POOL, "5")  # who bears it is not yet decided

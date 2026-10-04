@@ -69,8 +69,9 @@ code for it:
     (`pooled_in`), created by `collect_into`.
 - **`receive`, phase 1, in a cross-tenant operation.** Each bank transaction
   becomes one append-only `Collection`, then a `CollectionRouting`:
-  - a pay-in is routed by the payment reference `<5-digit group code>#<member's
-    mobile>` (`55555#0712597024`), and only when that number is a current
+  - a pay-in is routed by the payment reference `<7-digit group code> <member's
+    mobile>` (`1234566 0712597024`; the last code digit is a Damm check digit,
+    `shared_kernel/check_digit.py`, so a typo names no group), and only when that number is a current
     member of that group;
   - a payout is routed by the one mandate reference it quotes;
   - anything else is `held`, with a `PoolAlert`. Never guess a group.
