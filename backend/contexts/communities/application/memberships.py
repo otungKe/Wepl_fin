@@ -1,5 +1,6 @@
 """Use cases for a membership spell: join, change the title, leave (ADR-0012)."""
 from django.db import transaction
+from django.utils import timezone
 
 from contexts.audit.public import record
 from contexts.identity.public import register_person
@@ -79,8 +80,8 @@ def leave_group(membership_id: int, *, actor: str) -> MembershipView:
         ensure_can_leave(m.status)
     except MembershipError as exc:
         raise CommunityError(str(exc)) from None
-    m.status = "left"
-    m.save(update_fields=["status"])
+    m.status, m.left_at = "left", timezone.now()
+    m.save(update_fields=["status", "left_at"])
     record(actor, "member.left", target_type="membership", target_id=m.pk, group_id=m.group_id,
            data={"code": m.member_code})
     return membership(m.pk)

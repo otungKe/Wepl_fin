@@ -1,30 +1,55 @@
 # ADR-0014: Treatment of outstanding balances after membership ends
 
-- **Status:** **Direction decided, details open.**
+- **Status:** **Direction decided; built on recommended details that
+  Harry has not yet confirmed.**
   - Harry decided (2026-09-30) that each group chooses, in its constitution
     at onboarding, between `SHARES_UNTIL_PAID` and `FROZEN_AT_LEAVING`, with
     no universal behaviour.
-  - The model and the remaining decisions are in
-    [the design](../architecture/design-leaver-balance-policy.md).
-  - Not implemented yet. Raised by the membership review
-  (2026-09-30); see
-  [the review](../architecture/review-communities-membership.md), sections
-  E and F.
+  - Built 2026-10-04 on the three details recommended to Harry on
+    2026-10-04 (see "Details built" below). If he answers differently, the
+    rule changes in one place: `custody/domain/sharing.py`.
+  - The model is in
+    [the design](../architecture/design-leaver-balance-policy.md). Raised by
+    the membership review (2026-09-30); see
+    [the review](../architecture/review-communities-membership.md), sections
+    E and F.
 
 ## Question
 
 > Does an unpaid balance of a leaver continue participating in
 > interest/return calculations until settlement?
 
-## What the code does today (CONFIRMED, not decided)
+## What the code does (CONFIRMED, tested)
 
-- Custody's `sharing_facts` shares interest, bank charges and pro-rata
-  payouts among **active** members only. So when a member leaves:
-  - their balance stops earning interest and bearing charges;
-  - the interest their money earns goes to the others.
-- Nobody chose this. It follows from reading membership status.
-- `custody/tests/integration/test_returning_member.py::LeaverSharingTests`
-  pins it, so a decision has to change that test deliberately.
+- **The choice is required.** `adopt_constitution` refuses a constitution
+  without `leaver_balances` (`shares_until_paid` or `frozen_at_leaving`).
+  There is no default.
+- **Leaving records when.** `Membership.left_at` is set by `leave_group`.
+  The database refuses to change it once set, and requires it exactly when
+  the status is `left` (communities migration 0014). Existing leavers were
+  given the time of their `member.left` audit record.
+- **Sharing is judged on the event's date** (`StatementLine.posted_at`),
+  not the day the statement arrived (`custody/domain/sharing.py`):
+  - a member in the group that day shares interest, bank charges and
+    pro-rata payouts;
+  - a member who joined after the event shares nothing from it;
+  - a leaver shares interest and charges only if the rule in force on the
+    day they left was `SHARES_UNTIL_PAID` and their balance is still above
+    zero;
+  - a leaver never shares a pro-rata payout made after they left.
+- Tests: `custody/tests/unit/test_sharing.py`,
+  `custody/tests/integration/test_leaver_balances.py`.
+
+## Details built (recommended, awaiting Harry's confirmation)
+
+1. **Which version of the rule:** the one in force on the day the member
+   left. A later change does not reach back to earlier leavers.
+2. **"Paid out" means the balance reaches zero.** A leaver with nothing
+   left stops sharing.
+3. **Group spending after leaving:** a leaver is excluded from every
+   pro-rata payout dated after they left. (Simplification: the payout's
+   date is used, not the date it was approved. A payout approved before
+   they left but paid after does not reach them.)
 
 ## Options put to Harry
 
@@ -49,13 +74,12 @@
 
 ## Also open (UNKNOWN)
 
-- Whether a leaver's pro-rata share of *group spending* (not bank charges)
-  should apply after leaving.
 - Whether arrears owed by a leaver accrue penalties after leaving.
   Contributions and arrears do not exist in the code yet.
 - Settling net of debts ("less any loan owed", pilot template §7).
-- The case where every member has left. Today it raises "no active members
-  to share this among".
+- The case where nobody shares an event (every member has left under
+  `FROZEN_AT_LEAVING`). It still raises "no active members to share this
+  among".
 
 ## Owner
 

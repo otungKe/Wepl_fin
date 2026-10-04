@@ -1,2 +1,3 @@
 Django>=5.2.17,<5.3  # latest 5.2 LTS patch; see docs/architecture/foundational-decisions.md
 psycopg[binary]>=3.2,<4
+cryptography>=46,<47  # operator authenticator secrets, encrypted at rest (ADR-0021)

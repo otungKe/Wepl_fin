@@ -69,6 +69,8 @@ echo "   identical: $(cut -d' ' -f1 "$DUMP.copy" | sort | uniq -c | xargs)"
 echo "== 3. The application on the copy"
 DB_NAME="$SCRATCH" python manage.py migrate --check
 DB_NAME="$SCRATCH" python manage.py check_ledger_integrity
-DB_NAME="$SCRATCH" python manage.py operator_inbox --operator restore-drill | tail -3
+# The inbox reads every group; the command needs a signed-in operator, so call the use case directly.
+DB_NAME="$SCRATCH" python manage.py shell -c "from contexts.operations.public import operator_inbox; \
+print(len(operator_inbox(actor='system:restore-drill')), 'open item(s) in the operator inbox')"
 
 echo "== Restore drill passed for $SOURCE"

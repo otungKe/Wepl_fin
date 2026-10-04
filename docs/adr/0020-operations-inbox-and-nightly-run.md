@@ -26,7 +26,7 @@
    digest and the nightly run. It owns no problem itself: alerts,
    reconciliations and integrity checks stay in custody and the ledger, and
    operators act through those contexts.
-2. **The operator inbox** (`python manage.py operator_inbox --operator NAME`)
+2. **The operator inbox** (`python manage.py operator_inbox --operator EMAIL --code CODE`, or `GET /operators/inbox`; ADR-0021)
    lists every open problem in every group, urgent first, then oldest first:
    - an integrity check that failed (urgent);
    - money that left without a mandate (urgent);

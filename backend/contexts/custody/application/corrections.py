@@ -11,6 +11,7 @@ from contexts.identity.public import Msisdn
 from ..contract import CustodyError
 from ..domain import accounting
 from ..domain.resolution import InvalidCorrection, Outcome, ensure_correction
+from ..domain.sharing import Event
 from ..infrastructure.models import Alert, ExternalAccount, LineResolution, PayerMapping, StatementLine
 from . import bookkeeping as bk
 from .authority import corrector
@@ -74,7 +75,7 @@ def explain_outflow(line_id: int, mandate_id: int, *, by: int) -> LineResolution
             raise CustodyError("The mandate must be for this fund and exactly this amount.")
         if m.status is not MandateStatus.ISSUED or not execute_mandate(m.id, line_id=line.pk, when=timezone.now()):
             raise CustodyError(f"Mandate {m.reference} is not available ({m.status}).")
-        ids, balances = bk.sharing_facts(ea)
+        ids, balances = bk.sharing_facts(ea, at=line.posted_at, event=Event.PAYOUT)
         count = line.resolutions.count()
         draft = accounting.payout_explained(bk.book(ea), key=f"line:{line.pk}:explain:{count}", line_id=line.pk,
                                             amount=bk.amount(line), allocation=m.allocation,

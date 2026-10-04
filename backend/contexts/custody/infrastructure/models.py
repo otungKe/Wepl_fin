@@ -33,6 +33,7 @@ class ExternalAccount(models.Model):
     connector = models.CharField(max_length=40)
     currency = models.CharField(max_length=3, default="KES")
     linked_at = models.DateTimeField(auto_now_add=True)
+    closed_at = models.DateTimeField(null=True, editable=False)  # set once (custody 0007)
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=["institution", "account_number"], name="custody_account_unique")]

@@ -76,26 +76,3 @@ class LeavingRecordsOnlyTheEndOfTheSpellTests(TestCase):
             self.assertEqual({t.__name__: t.objects.count() for t in tables}, before)
         self.assertEqual(s.balance_of(s.m[0]), Money("1000"))
         s.assert_sound(self)
-
-
-class LeaverSharingTests(TestCase):
-    """PINNED, NOT DECIDED. Today a member who left stops sharing interest and
-    bank charges, and the interest their money earns goes to the others,
-    because sharing reads *active* members. Harry has not yet decided whether
-    a leaver's unpaid balance should share until it is paid out (ADR-0014,
-    open). This test names today's behaviour so the decision changes it
-    deliberately, never by accident."""
-
-    def test_a_leavers_balance_is_frozen_today(self):
-        s = Scenario()
-        self.enterContext(s.acting())
-        for m in s.m:
-            bank.deposit(N, "1000", msisdn=m.msisdn, name="X")
-        s.sync()
-        leave_group(s.m[3].id, actor="test")
-        bank.credit_interest(N, "100")
-        bank.charge(N, "10")
-        s.sync()
-        self.assertEqual(s.balance_of(s.m[3]), Money("1000"))
-        self.assertEqual({s.balance_of(m) for i, m in enumerate(s.m) if i != 3}, {Money("1022.50")})
-        s.assert_sound(self)

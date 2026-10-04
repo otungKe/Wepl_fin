@@ -27,7 +27,8 @@ PEOPLE = [
 SIGNATORY = (Capability.APPROVE_PAYOUT, Capability.CANCEL_PAYOUT, Capability.CORRECT_RECORDS)
 RULES = {"approvals": [{"up_to": "20000", "approvers": "designated", "required": 2},
                        {"up_to": None, "approvers": "members", "required": 4}],
-         "bank_charges": "pro_rata", "interest": "pro_rata", "mandate_valid_days": 14}
+         "bank_charges": "pro_rata", "interest": "pro_rata", "mandate_valid_days": 14,
+         "leaver_balances": "frozen_at_leaving"}
 
 
 class Command(BaseCommand):

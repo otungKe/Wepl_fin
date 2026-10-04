@@ -29,8 +29,14 @@ class BootGuardTests(TestCase):
                 self.assertNotEqual(result.returncode, 0)
                 self.assertIn("WEPL_ENABLE_SIMULATOR must be 0", result.stderr)
 
-    def test_a_correct_production_configuration_boots(self):
+    def test_production_needs_its_own_operator_key(self):
         result = boot(DJANGO_DEBUG="0", DJANGO_SECRET_KEY="a-real-secret", WEPL_ENABLE_SIMULATOR="0")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("WEPL_OPERATOR_KEY must be set", result.stderr)
+
+    def test_a_correct_production_configuration_boots(self):
+        result = boot(DJANGO_DEBUG="0", DJANGO_SECRET_KEY="a-real-secret", WEPL_ENABLE_SIMULATOR="0",
+                      WEPL_OPERATOR_KEY="kTn6hqEYgtqMm1D0bc7k2bXbK1o3e9mLqvH4CUtdUfI=")
         self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_production_refuses_a_digest_that_would_never_be_sent(self):

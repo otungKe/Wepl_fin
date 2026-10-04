@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import datetime
 
 from .domain.fund import FundStatus
 from .domain.membership import MembershipStatus
@@ -40,6 +41,8 @@ class MembershipView:
     title: str  # the group's own label, e.g. "Treasurer"; grants nothing (ADR-0011)
     status: str
     code: str
+    joined_at: datetime | None = None
+    left_at: datetime | None = None  # when the spell ended (ADR-0014)
 
     @property
     def is_active(self) -> bool:

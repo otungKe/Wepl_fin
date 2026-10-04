@@ -84,6 +84,24 @@ reconciles; the alert is the control, not the reconciliation.
 - **`python manage.py demo_custody_pilot`:** the 20-minute custody demo. It uses public
   surfaces only; keep it that way, because it is also CI's end-to-end check.
 
+## Closing an account (ADR-0015 addendum)
+
+- `close_external_account(ea, by, confirmed_by)`: two `correct_records`
+  holders; refuses unless a fresh reconciliation shows a zero statement
+  balance, no difference, gap, break or unaccounted line, and no open alert
+  on its lines. Sync the final statement first.
+- A closed account never reopens, never changes and takes no new line
+  (custody 0007). Ingest refuses new activity on it, so `sync_accounts`
+  fails loudly; collections calls are refused.
+- The fund's close trigger counts only accounts that are still open.
+
+## Sharing and leavers (ADR-0014)
+
+- `domain/sharing.py` decides who shares an event, judged on the line's
+  `posted_at`: members in the group that day; leavers only for interest and
+  charges, only under `shares_until_paid` as in force when they left, and
+  only while their balance is above zero; never a payout after leaving.
+
 ## Do not assume
 
 - **Custodian formats are unknown.** The real custodian statement format, push

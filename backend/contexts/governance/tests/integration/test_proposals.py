@@ -12,7 +12,8 @@ from contexts.shared_kernel.money import Money
 from tests.scenario import SIGNATORY, act_for_new_group
 
 RULES = {"approvals": [{"up_to": "20000", "approvers": "designated", "required": 2},
-                       {"up_to": None, "approvers": "members", "required": 3}]}
+                       {"up_to": None, "approvers": "members", "required": 3}],
+         "leaver_balances": "frozen_at_leaving"}
 
 
 class ProposalTests(TestCase):
@@ -119,6 +120,20 @@ class ProposalTests(TestCase):
             with self.assertRaisesMessage(DatabaseError, "append-only"):
                 with transaction.atomic():
                     action()
+
+    def test_a_constitution_must_choose_what_happens_to_a_leavers_balance(self):
+        """ADR-0014: no default; the group decides at onboarding."""
+        from contexts.governance.public import RulesError, rules_in_force
+        silent = {k: v for k, v in RULES.items() if k != "leaver_balances"}
+        with self.assertRaisesMessage(RulesError, "leaver_balances"):
+            adopt_constitution(self.group.id, silent, actor="t")
+        with self.assertRaises(RulesError):
+            adopt_constitution(self.group.id, {**RULES, "leaver_balances": "whatever"}, actor="t")
+        first = Constitution.objects.get(group_id=self.group.id, version=1).effective_from
+        adopt_constitution(self.group.id, {**RULES, "leaver_balances": "shares_until_paid"}, actor="t")
+        self.assertEqual(rules_in_force(self.group.id, first)[1].leaver_balances.value, "frozen_at_leaving")
+        later = Constitution.objects.get(group_id=self.group.id, version=2).effective_from
+        self.assertEqual(rules_in_force(self.group.id, later)[1].leaver_balances.value, "shares_until_paid")
 
     def test_amounts_are_money(self):
         with self.assertRaises(Exception):

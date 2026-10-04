@@ -2,6 +2,7 @@
 (ADR-0011)."""
 from django.db import DatabaseError, transaction
 from django.test import TestCase
+from django.utils import timezone
 
 from contexts.audit.public import history
 from contexts.communities.infrastructure.models import Membership
@@ -12,7 +13,7 @@ from contexts.governance.public import (Capability, GovernanceError, adopt_const
                                         propose_withdrawal, revoke)
 from tests.scenario import act_for_new_group
 
-RULES = {"approvals": [{"up_to": None, "approvers": "designated", "required": 1}]}
+RULES = {"approvals": [{"up_to": None, "approvers": "designated", "required": 1}], "leaver_balances": "frozen_at_leaving"}
 
 
 class CapabilityTests(TestCase):
@@ -59,7 +60,7 @@ class CapabilityTests(TestCase):
 
     def test_a_member_who_left_holds_nothing_and_cannot_be_granted(self):
         grant(self.b.id, Capability.APPROVE_PAYOUT, actor="t")
-        Membership.objects.filter(pk=self.b.id).update(status="left")
+        Membership.objects.filter(pk=self.b.id).update(status="left", left_at=timezone.now())
         self.assertEqual(capabilities_of(self.b.id), frozenset())
         with self.assertRaisesMessage(GovernanceError, "active member"):
             grant(self.b.id, Capability.CORRECT_RECORDS, actor="t")

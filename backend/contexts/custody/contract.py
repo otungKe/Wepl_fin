@@ -26,6 +26,11 @@ class ExternalAccountView:
     account_name: str
     connector: str
     currency: str
+    closed_at: datetime | None = None
+
+    @property
+    def is_open(self) -> bool:
+        return self.closed_at is None
 
     def __str__(self):
         return f"{self.institution} {self.account_number}"

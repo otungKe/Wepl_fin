@@ -27,7 +27,7 @@ def _for_group(group_id: int, name: str) -> list[InboxItem]:
     now, items = timezone.now(), []
     for a in open_alerts(group_id):
         items.append(InboxItem(group_id, name, ItemKind(a["kind"]), a.get("created_at"), a["message"]))
-    for ea in accounts_for_group(group_id):
+    for ea in (a for a in accounts_for_group(group_id) if a.is_open):
         last = latest_reconciliation(ea.id)
         if is_stale(last.run_at if last else None, now):
             items.append(InboxItem(group_id, name, ItemKind.NOT_RECONCILED, last.run_at if last else None,

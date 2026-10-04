@@ -23,6 +23,7 @@ other's models directly, and kept rules in `services.py` files.
 | `notifications` | Messages decided on (outbox) and their delivery | Deciding what is worth saying |
 | `audit` | Accountability records and operation ids | Operational logs |
 | `operations` | The operator inbox, the daily digest and the nightly run (ADR-0020) | The problems it reports; resolving them; who in a group is told |
+| `operators` | WEPL staff accounts, staged sign-in, operator sessions, lockout, step-up, operator roles and capabilities, the sign-in log (ADR-0021) | Members and their group capabilities; what an operator may do inside a context; the audit trail of actions in a group |
 | `shared_kernel` | `Money` | Any business rule |
 
 Each context has, only where needed:

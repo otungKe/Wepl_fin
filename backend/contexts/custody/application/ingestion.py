@@ -6,11 +6,12 @@ from contexts.communities.public import group_view, members
 from contexts.governance.public import execute_mandate, find_by_reference, issued_for_amount, mandate
 from contexts.notifications.public import notify
 
-from ..contract import IngestResult
+from ..contract import CustodyError, IngestResult
 from ..domain import accounting
 from ..domain.attribution import MemberFacts, attribute
 from ..domain.matching import match_outflow, quoted_references
 from ..domain.resolution import Outcome
+from ..domain.sharing import Event
 from ..domain.statement import BankLine, LineKind
 from ..infrastructure.models import Alert, ExternalAccount, PayerMapping, StatementLine
 from . import bookkeeping as bk
@@ -34,6 +35,9 @@ def ingest(ea_id: int, bank_lines) -> IngestResult:
                         _conflict(ea, existing, bl)
                         result.conflicts += 1
                     continue
+                if ea.closed_at is not None:  # the database refuses it too (custody 0007)
+                    raise CustodyError(f"{ea.institution} {ea.account_number} was closed on {ea.closed_at:%d %b %Y}, "
+                                       f"but the custodian reports a new transaction {bl.external_id}.")
                 line = StatementLine.objects.create(
                     external_account=ea, external_id=bl.external_id, sequence=bl.sequence, posted_at=bl.posted_at,
                     kind=LineKind(bl.kind), amount=bl.amount, narration=bl.narration[:255],
@@ -91,14 +95,14 @@ def _deposit(ea, line):
 
 
 def _interest(ea, line):
-    ids, balances = bk.sharing_facts(ea)
+    ids, balances = bk.sharing_facts(ea, at=line.posted_at, event=Event.RETURNS)
     draft = accounting.interest(bk.book(ea), key=f"line:{line.pk}:interest", line_id=line.pk, amount=bk.amount(line),
                                 rule=bk.rules(ea).interest, member_ids=ids, balances=balances)
     bk.post_and_resolve(line, draft, Outcome.INTEREST)
 
 
 def _charge(ea, line):
-    ids, balances = bk.sharing_facts(ea)
+    ids, balances = bk.sharing_facts(ea, at=line.posted_at, event=Event.RETURNS)
     draft = accounting.charge(bk.book(ea), key=f"line:{line.pk}:charge", line_id=line.pk, amount=bk.amount(line),
                               rule=bk.rules(ea).bank_charges, member_ids=ids, balances=balances)
     bk.post_and_resolve(line, draft, Outcome.CHARGE)
@@ -112,7 +116,7 @@ def _withdrawal(ea, line):
                           candidates=[] if quoted else issued_for_amount(ea.fund_id, amount))
     if match.mandate_id and execute_mandate(match.mandate_id, line_id=line.pk, when=line.posted_at):
         m = mandate(match.mandate_id)
-        ids, balances = bk.sharing_facts(ea)
+        ids, balances = bk.sharing_facts(ea, at=line.posted_at, event=Event.PAYOUT)
         draft = accounting.authorised_payout(bk.book(ea), key=f"line:{line.pk}:payout", line_id=line.pk, amount=amount,
                                              allocation=m.allocation, charged_member_id=m.charged_member_id,
                                              member_ids=ids, balances=balances, reference=m.reference)

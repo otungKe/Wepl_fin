@@ -27,6 +27,13 @@ class SharingRule(StrEnum):
     RETAINED = "retained"   # kept at group level
 
 
+class LeaverBalances(StrEnum):
+    """What a former member's balance does after their spell ends, until it
+    is paid out (ADR-0014). Each group chooses at onboarding."""
+    SHARES_UNTIL_PAID = "shares_until_paid"   # keeps sharing interest and bank charges by balance
+    FROZEN_AT_LEAVING = "frozen_at_leaving"   # takes part in no interest or charge dated after it left
+
+
 @dataclass(frozen=True)
 class ApprovalTier:
     up_to: Money | None
@@ -41,6 +48,13 @@ class ConstitutionRules:
     bank_charges: SharingRule = SharingRule.PRO_RATA
     interest: SharingRule = SharingRule.PRO_RATA
     mandate_valid_days: int = 14
+    # None only in versions adopted before ADR-0014. They read as frozen,
+    # because that is what the software did while they were in force.
+    leaver_balances: LeaverBalances | None = None
+
+    @property
+    def leaver_treatment(self) -> LeaverBalances:
+        return self.leaver_balances or LeaverBalances.FROZEN_AT_LEAVING
 
     @classmethod
     def parse(cls, raw: dict) -> ConstitutionRules:
@@ -72,7 +86,8 @@ class ConstitutionRules:
         try:
             return cls(tiers=tuple(tiers), allow_self_approval=bool(raw.get("allow_self_approval", False)),
                        bank_charges=SharingRule(raw.get("bank_charges", "pro_rata")),
-                       interest=SharingRule(raw.get("interest", "pro_rata")), mandate_valid_days=days)
+                       interest=SharingRule(raw.get("interest", "pro_rata")), mandate_valid_days=days,
+                       leaver_balances=LeaverBalances(raw["leaver_balances"]) if raw.get("leaver_balances") else None)
         except ValueError as exc:
             raise RulesError(str(exc)) from None
 
@@ -82,6 +97,7 @@ class ConstitutionRules:
                            "required": t.required} for t in self.tiers],
             "allow_self_approval": self.allow_self_approval, "bank_charges": self.bank_charges.value,
             "interest": self.interest.value, "mandate_valid_days": self.mandate_valid_days,
+            **({"leaver_balances": self.leaver_balances.value} if self.leaver_balances else {}),
         }
 
     def tier_for(self, amount: Money) -> ApprovalTier:
