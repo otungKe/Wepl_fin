@@ -158,3 +158,14 @@ Only five relationships are checked in the database:
   key fails the build, not a security review.
 - Extracting a context later (ADR-0004) turns each composite key into an
   integration check. The inventory above is that work list.
+
+## Addendum (2026-10-04): keys added under row-level security
+
+- **The gap.** PostgreSQL checks the rows already in a table with a query
+  that obeys forced row-level security. A key added with no tenant context
+  was therefore checked against no rows.
+  - The restore drill found this (`docs/operations/restore-drill.md`).
+- **The fix.**
+  - `same_tenant()` now adds each key in a cross-tenant step.
+  - Tenancy migration 0002 re-adds every existing foreign key the same way.
+- **The decision itself is unchanged.**

@@ -178,3 +178,13 @@ models directly. "Proposed" does not mean absent; check the code.
 Develop on the thread's branch. Commits end with the Co-Authored-By and
 Claude-Session trailers the session gives you. Model names never go in commits
 or PRs.
+
+**Migrations run under forced row-level security.** A migration has no
+tenant context, so any query it makes sees no rows. That includes the check
+PostgreSQL runs when a foreign key is added. So:
+- add keys with `persistence.tenancy.same_tenant`, or wrap the SQL in
+  `CROSS_TENANT_ON` and `CROSS_TENANT_OFF`;
+- run any data check the same way (`no_existing_violations`).
+
+Otherwise the migration silently checks nothing. The restore drill
+(`backend/scripts/restore_drill.sh`, run in CI) is the backstop.

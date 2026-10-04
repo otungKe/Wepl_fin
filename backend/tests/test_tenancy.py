@@ -1,6 +1,7 @@
 """Tenant isolation enforced by PostgreSQL row-level security (ADR-0009,
 foundational decisions 2–8). These tests go around the application on
 purpose, with raw SQL and the ORM, to show the database itself refuses."""
+from contextlib import contextmanager
 from unittest import mock
 
 from django.apps import apps
@@ -16,6 +17,7 @@ from contexts.ledger.infrastructure.models import JournalEntry
 from contexts.ledger.public import member_balances
 from contexts.tenancy.contract import TenantScope
 from contexts.tenancy.infrastructure.session import database_tenant, role_bypasses_rls
+from persistence.tenancy import revalidate_foreign_keys, same_tenant
 from contexts.tenancy.public import TenancyError, cross_tenant, current_tenant, provision_tenant, tenant
 from simulators.custodian_bank import bank
 from tests.scenario import SIGNATORY, Scenario
@@ -217,3 +219,48 @@ class EveryTenantKeyIsReachableUnderRlsTests(TestCase):
                    for table, index, first, second in rows
                    if first == "tenant_id" and (table, second) not in leading]
         self.assertEqual(missing, [])
+
+
+class ForeignKeysSeeEveryTenantTests(TestCase):
+    """Adding a foreign key checks the rows already there, but under forced
+    row-level security PostgreSQL's check sees only what the policy shows.
+    Found by the restore drill (2026-10-04)."""
+
+    def setUp(self):
+        self.a, self.b = Scenario("A"), Scenario("B", account="0012345678902")
+        with cross_tenant("test: plant a row that names another tenant's group", actor="test"), \
+                connection.cursor() as c, settled(c):
+            c.execute("ALTER TABLE communities_membership DROP CONSTRAINT communities_membership_group_id_same_tenant")
+            c.execute("ALTER TABLE communities_membership DISABLE TRIGGER communities_membership_allocate")  # also refuses
+            c.execute("""INSERT INTO communities_membership (status, member_code, joined_at, group_id, person_id,
+                                                             tenant_id, title)
+                         SELECT 'left', 'M99', joined_at, %s, person_id, tenant_id, title
+                         FROM communities_membership WHERE id = %s""", [self.b.group.id, self.a.m[0].id])
+            c.execute("ALTER TABLE communities_membership ENABLE TRIGGER communities_membership_allocate")
+
+    def test_a_key_added_later_is_checked_against_every_tenants_rows(self):
+        forward, _ = same_tenant("communities_membership", "group_id", "communities_group")
+        with self.assertRaisesMessage(DatabaseError, "communities_membership_group_id_same_tenant"), \
+                transaction.atomic(), connection.cursor() as c:
+            c.execute(forward)  # no tenant context, as in a migration
+
+    def test_revalidating_every_key_finds_rows_that_break_one(self):
+        with cross_tenant("test: put the key back unchecked", actor="test"), connection.cursor() as c:
+            c.execute("""ALTER TABLE communities_membership ADD CONSTRAINT communities_membership_group_id_same_tenant
+                         FOREIGN KEY (group_id, tenant_id) REFERENCES communities_group (id, tenant_id)
+                         DEFERRABLE INITIALLY DEFERRED NOT VALID""")
+        with connection.cursor() as c, settled(c), self.assertRaisesMessage(DatabaseError, "same_tenant"), \
+                transaction.atomic():
+            c.execute(revalidate_foreign_keys())
+
+
+@contextmanager
+def settled(c):
+    """Run the transaction's pending deferred checks so tables can be altered,
+    then defer them again. Every deferrable constraint here starts deferred,
+    and SET CONSTRAINTS would otherwise outlive the test's savepoint."""
+    c.execute("SET CONSTRAINTS ALL IMMEDIATE")
+    try:
+        yield
+    finally:
+        c.execute("SET CONSTRAINTS ALL DEFERRED")

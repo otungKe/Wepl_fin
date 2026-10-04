@@ -45,3 +45,10 @@ jobs:
         run: |
           python manage.py migrate
           python manage.py demo_custody_pilot
+      - name: Restore drill (back up, restore, prove the copy is identical and works)
+        working-directory: backend
+        env:
+          PGHOST: localhost
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: scripts/restore_drill.sh wepl
