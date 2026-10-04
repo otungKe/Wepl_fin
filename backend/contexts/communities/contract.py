@@ -25,6 +25,7 @@ class FundView:
     name: str
     currency: str
     status: str
+    code: str | None = None
 
     @property
     def is_open(self) -> bool:

@@ -34,7 +34,11 @@ def all_accounts() -> list[ExternalAccountView]:
 @transaction.atomic
 def link_external_account(fund_id: int, *, institution: str, account_number: str, account_name: str,
                           connector: str, actor: str) -> ExternalAccountView:
-    """Record where a fund's money is held. One custodian account backs one fund."""
+    """Record the group's bank account. It holds all the group's funds
+    (ADR-0023); ``fund_id`` is the default fund, which takes pay-ins quoting
+    no fund code, interest and charges unless the group chose otherwise, and
+    outflows nobody has explained yet. The default fund cannot close while
+    the account is open."""
     fund = fund_view(fund_id)
     if not fund.is_open:
         raise CustodyError(f"{fund.name} is closed.")

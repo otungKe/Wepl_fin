@@ -1,7 +1,7 @@
 from django.db import transaction
 
 from contexts.audit.public import current_operation_id, operation, record
-from contexts.ledger.public import account_balance, fund_position
+from contexts.ledger.public import FundPosition, cash_by_fund, fund_position
 from contexts.notifications.public import notify
 from contexts.shared_kernel.money import Money
 
@@ -9,7 +9,6 @@ from ..contract import IngestResult, ReconciliationView
 from ..domain.reconciliation import assess, balance_breaks
 from ..domain.statement import Connector, LineKind
 from ..infrastructure.models import Alert, ExternalAccount, ReconciliationRun
-from . import bookkeeping as bk
 from .ingestion import ingest
 
 
@@ -22,6 +21,22 @@ def _view(r: ReconciliationRun) -> ReconciliationView:
         run_at=r.run_at)
 
 
+def account_funds(ea: ExternalAccount) -> list[int]:
+    """The funds held at this account: the default and any that ever had cash here (ADR-0023)."""
+    return sorted({ea.fund_id, *cash_by_fund(ea.pk, ea.currency)})
+
+
+def account_position(ea: ExternalAccount) -> FundPosition:
+    """The books of every fund held at the account, added up. Cash is only
+    what they hold at this account; the account's balance is its sum."""
+    cur, zero = ea.currency, Money.zero(ea.currency)
+    parts = [fund_position(f, cur) for f in account_funds(ea)]
+    total = lambda field: sum((getattr(p, field) for p in parts), zero)
+    return FundPosition(cash=sum(cash_by_fund(ea.pk, cur).values(), zero), member_interests=total("member_interests"),
+                        unattributed=total("unattributed"), retained=total("retained"),
+                        unexplained_out=total("unexplained_out"))
+
+
 @transaction.atomic  # the account lock gives a consistent snapshot of lines and books
 def reconcile(ea_id: int) -> ReconciliationView:
     """Compare WEPL's books with the custodian's statement and record the result."""
@@ -30,12 +45,12 @@ def reconcile(ea_id: int) -> ReconciliationView:
         lines = ea.lines.order_by("sequence")
         last = lines.exclude(running_balance__isnull=True).last()
         cur = ea.currency
+        pos = account_position(ea)
         a = assess(statement_balance=Money(last.running_balance, cur) if last else None,
-                   ledger_cash=account_balance(bk.book(ea).cash()),
+                   ledger_cash=pos.cash,
                    sequences=list(lines.exclude(kind=LineKind.OPENING).values_list("sequence", flat=True)),
                    unresolved=lines.filter(resolutions__isnull=True).count(),
                    breaks=balance_breaks(lines.values_list("sequence", "kind", "amount", "running_balance")))
-        pos = fund_position(ea.fund_id, cur)
         run = ReconciliationRun.objects.create(
             external_account=ea, statement_balance=last.running_balance if last else None,
             ledger_cash=pos.cash.amount, difference=a.difference.amount if a.difference else None,

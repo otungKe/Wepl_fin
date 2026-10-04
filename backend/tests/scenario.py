@@ -15,7 +15,7 @@ RULES = {
     "approvals": [{"up_to": "20000", "approvers": "designated", "required": 2},
                   {"up_to": None, "approvers": "members", "required": 3}],
     "bank_charges": "pro_rata", "interest": "pro_rata", "leaver_balances": "frozen_at_leaving",
-    "leaver_rule_version": "at_leaving", "leaver_payouts": "never",
+    "leaver_rule_version": "at_leaving", "leaver_payouts": "never", "account_returns": "default_fund",
 }
 # The pilot constitution names three officials and gives them these powers.
 # The titles are labels; the grants are what the software checks (ADR-0011).
@@ -57,14 +57,14 @@ class Scenario:
         with self.acting():
             return custody_sync(self.ea.id, connector or SimulatorConnector(sweep=True))
 
-    def approve(self, amount, *, payee_account="0799000000", charged=None, proposer=None) -> str:
+    def approve(self, amount, *, payee_account="0799000000", charged=None, proposer=None, fund=None) -> str:
         """Propose and approve a withdrawal; returns the mandate reference."""
         with self.acting():
-            return self._approve(amount, payee_account=payee_account, charged=charged, proposer=proposer)
+            return self._approve(amount, payee_account=payee_account, charged=charged, proposer=proposer, fund=fund)
 
-    def _approve(self, amount, *, payee_account, charged, proposer) -> str:
+    def _approve(self, amount, *, payee_account, charged, proposer, fund=None) -> str:
         proposer = proposer or self.m[1]
-        p = propose_withdrawal(proposer.id, self.fund.id, amount=amount, purpose="Test", payee_name="Supplier",
+        p = propose_withdrawal(proposer.id, (fund or self.fund).id, amount=amount, purpose="Test", payee_name="Supplier",
                                payee_account=payee_account, charged_member_id=charged.id if charged else None)
         for a in eligible_approvers(p.id):
             if proposal_view(p.id).mandate_reference:

@@ -21,13 +21,15 @@ def mandate(mandate_id: int) -> MandateView:
     return _view(Mandate.objects.get(pk=mandate_id))
 
 
-def find_by_reference(fund_id: int, references) -> MandateView | None:
-    m = Mandate.objects.filter(fund_id=fund_id, reference__in=list(references)).order_by("id").first()
+# A group's funds share its one bank account (ADR-0023), so a payout from it
+# may be any of the group's mandates; each says which fund it spends.
+def find_by_reference(group_id: int, references) -> MandateView | None:
+    m = Mandate.objects.filter(group_id=group_id, reference__in=list(references)).order_by("id").first()
     return _view(m) if m else None
 
 
-def issued_for_amount(fund_id: int, amount: Money) -> list[MandateView]:
-    return [_view(m) for m in Mandate.objects.filter(fund_id=fund_id, status=MandateStatus.ISSUED,
+def issued_for_amount(group_id: int, amount: Money) -> list[MandateView]:
+    return [_view(m) for m in Mandate.objects.filter(group_id=group_id, status=MandateStatus.ISSUED,
                                                      amount=amount.amount, currency=amount.currency).order_by("id")]
 
 

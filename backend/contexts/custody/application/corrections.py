@@ -36,7 +36,8 @@ def attribute_payment(line_id: int, membership_id: int, *, by: int, remember_pay
         except InvalidCorrection as exc:
             raise CustodyError(f"Only unattributed receipts can be attributed. {exc}") from None
         count = line.resolutions.count()
-        draft = accounting.payer_identified(bk.book(ea), key=f"line:{line.pk}:attribute:{count}", line_id=line.pk,
+        held_in = bk.line_fund(line)  # the fund the pay-in went to (ADR-0023); it stays there
+        draft = accounting.payer_identified(bk.book(ea, held_in), key=f"line:{line.pk}:attribute:{count}", line_id=line.pk,
                                             amount=bk.amount(line), member_id=member.id)
         resolution = bk.post_and_resolve(line, draft, Outcome.ATTRIBUTED, membership_id=member.id, actor=actor,
                                          note="Attributed by a corrector")
@@ -71,20 +72,32 @@ def explain_outflow(line_id: int, mandate_id: int, *, by: int) -> LineResolution
             ensure_correction(bk.latest_outcome(line), Outcome.EXPLAINED)
         except InvalidCorrection as exc:
             raise CustodyError(f"Only unmatched outflows can be explained. {exc}") from None
-        if m.fund_id != ea.fund_id or m.amount != bk.amount(line):
-            raise CustodyError("The mandate must be for this fund and exactly this amount.")
+        if m.group_id != ea.group_id or m.amount != bk.amount(line):
+            raise CustodyError("The mandate must be this group's and for exactly this amount.")
         if m.status is not MandateStatus.ISSUED or not execute_mandate(m.id, line_id=line.pk, when=timezone.now()):
             raise CustodyError(f"Mandate {m.reference} is not available ({m.status}).")
-        ids, balances = bk.sharing_facts(ea, at=line.posted_at, event=Event.PAYOUT, approved_at=m.issued_at)
-        count = line.resolutions.count()
-        draft = accounting.payout_explained(bk.book(ea), key=f"line:{line.pk}:explain:{count}", line_id=line.pk,
-                                            amount=bk.amount(line), allocation=m.allocation,
-                                            charged_member_id=m.charged_member_id, member_ids=ids, balances=balances,
-                                            reference=m.reference)
-        resolution = bk.post_and_resolve(line, draft, Outcome.EXPLAINED, mandate_id=m.id, actor=actor,
-                                         note=f"Explained by mandate {m.reference}")
+        ids, balances = bk.sharing_facts(ea, m.fund_id, at=line.posted_at, event=Event.PAYOUT,
+                                         approved_at=m.issued_at)
+        resolution = _explain(ea, line, m, ids, balances, actor)
         Alert.objects.filter(kind=Alert.Kind.UNMATCHED_OUTFLOW, line=line, resolved_at__isnull=True).update(
             resolved_at=timezone.now(), resolution_note=f"Explained by mandate {m.reference} ({actor})")
         record(actor, "custody.outflow_explained", target_type="statement_line", target_id=line.pk,
                group_id=ea.group_id, data={"mandate": m.reference})
         return resolution
+
+
+def _explain(ea, line, m, ids, balances, actor) -> LineResolution:
+    """Post the explanation in the mandate's fund. The outflow was held as
+    unexplained in the fund it was posted to; when the mandate spends another
+    fund of the same account, that fund gets its cash back first (ADR-0023)."""
+    held_in, count, note = bk.line_fund(line), line.resolutions.count(), f"Explained by mandate {m.reference}"
+    terms = dict(key=f"line:{line.pk}:explain:{count}", line_id=line.pk, amount=bk.amount(line),
+                 allocation=m.allocation, charged_member_id=m.charged_member_id, member_ids=ids, balances=balances,
+                 reference=m.reference)
+    if held_in == m.fund_id:
+        return bk.post_and_resolve(line, accounting.payout_explained(bk.book(ea, held_in), **terms),
+                                   Outcome.EXPLAINED, mandate_id=m.id, actor=actor, note=note)
+    back, paid = accounting.payout_explained_elsewhere(bk.book(ea, held_in), bk.book(ea, m.fund_id), **terms)
+    bk.post_and_resolve(line, back, Outcome.EXPLAINED, mandate_id=m.id, actor=actor,
+                        note=f"Moved to the fund mandate {m.reference} spends")
+    return bk.post_and_resolve(line, paid, Outcome.EXPLAINED, mandate_id=m.id, actor=actor, note=note)

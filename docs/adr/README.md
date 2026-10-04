@@ -24,6 +24,7 @@
 | [0020](0020-operations-inbox-and-nightly-run.md) | An operations context: the nightly run drives each context's job in order, an operator inbox reads every group in turn, and a counts-only daily email digest | Proposed |
 | [0021](0021-operator-login.md) | How WEPL staff sign in: provisioned accounts, password plus authenticator, staged server-side sessions, capabilities that fail closed | Proposed (operators first: Harry); built |
 | [0022](0022-contributions-and-arrears.md) | Contributions and arrears: each fund's rule is the group's own constitution setting (schedule, amount, payment order, fines, leavers' arrears); arrears derived | Proposed; not built |
+| [0023](0023-one-account-holds-the-groups-funds.md) | One bank account holds all of a group's funds: fund code in the reference, else the default fund; interest and charges split as the group chooses; reconcile the account against all its funds | Code, else default: Harry; rest Proposed; built |
 
 All are **Proposed** until Harry accepts them. Harry's
 [foundational decisions](../architecture/foundational-decisions.md)

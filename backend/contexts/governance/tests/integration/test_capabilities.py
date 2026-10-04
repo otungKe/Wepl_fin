@@ -14,7 +14,8 @@ from contexts.governance.public import (Capability, GovernanceError, adopt_const
 from tests.scenario import act_for_new_group
 
 RULES = {"approvals": [{"up_to": None, "approvers": "designated", "required": 1}],
-         "leaver_balances": "frozen_at_leaving", "leaver_rule_version": "at_leaving", "leaver_payouts": "never"}
+         "leaver_balances": "frozen_at_leaving", "leaver_rule_version": "at_leaving", "leaver_payouts": "never",
+         "account_returns": "default_fund"}
 
 
 class CapabilityTests(TestCase):

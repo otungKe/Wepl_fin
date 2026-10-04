@@ -14,7 +14,8 @@ from tests.scenario import SIGNATORY, act_for_new_group
 RULES = {"approvals": [{"up_to": "20000", "approvers": "designated", "required": 2},
                        {"up_to": None, "approvers": "members", "required": 3}],
          "leaver_balances": "frozen_at_leaving",
-         "leaver_rule_version": "at_leaving", "leaver_payouts": "never"}
+         "leaver_rule_version": "at_leaving", "leaver_payouts": "never",
+         "account_returns": "default_fund"}
 
 
 class ProposalTests(TestCase):
@@ -122,10 +123,10 @@ class ProposalTests(TestCase):
                 with transaction.atomic():
                     action()
 
-    def test_a_constitution_must_state_each_leaver_choice(self):
-        """ADR-0014: no defaults; the group decides each one."""
+    def test_a_constitution_must_state_each_of_the_groups_choices(self):
+        """ADR-0014, ADR-0023: no defaults; the group decides each one."""
         from contexts.governance.public import RulesError, rules_in_force
-        for choice in ("leaver_balances", "leaver_rule_version", "leaver_payouts"):
+        for choice in ("leaver_balances", "leaver_rule_version", "leaver_payouts", "account_returns"):
             silent = {k: v for k, v in RULES.items() if k != choice}
             with self.subTest(choice), self.assertRaisesMessage(RulesError, choice):
                 adopt_constitution(self.group.id, silent, actor="t")

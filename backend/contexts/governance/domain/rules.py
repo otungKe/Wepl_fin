@@ -49,9 +49,19 @@ class LeaverPayouts(StrEnum):
     ALWAYS = "always"
 
 
-# The group's own choices: a constitution adopted from ADR-0014 on must state each.
+class AccountReturns(StrEnum):
+    """How interest and charges on the group's one bank account are split
+    among the funds it holds (ADR-0023). Inside each fund, ``interest`` and
+    ``bank_charges`` then say who shares them."""
+    DEFAULT_FUND = "default_fund"        # all of it to the group's default fund
+    BY_FUND_BALANCE = "by_fund_balance"  # across funds by what each holds at the account
+
+
 LEAVER_CHOICES = {"leaver_balances": LeaverBalances, "leaver_rule_version": LeaverRuleVersion,
                   "leaver_payouts": LeaverPayouts}
+# The group's own choices, with no WEPL default: a constitution adopted from
+# ADR-0014 (leavers) and ADR-0023 (funds sharing one account) on must state each.
+REQUIRED_CHOICES = {**LEAVER_CHOICES, "account_returns": AccountReturns}
 
 
 @dataclass(frozen=True)
@@ -73,6 +83,8 @@ class ConstitutionRules:
     leaver_balances: LeaverBalances | None = None
     leaver_rule_version: LeaverRuleVersion | None = None
     leaver_payouts: LeaverPayouts | None = None
+    # None only before ADR-0023: everything went to the account's one fund.
+    account_returns: AccountReturns | None = None
 
     @property
     def leaver_treatment(self) -> LeaverBalances:
@@ -86,8 +98,12 @@ class ConstitutionRules:
     def leaver_payout_share(self) -> LeaverPayouts:
         return self.leaver_payouts or LeaverPayouts.NEVER
 
+    @property
+    def account_split(self) -> AccountReturns:
+        return self.account_returns or AccountReturns.DEFAULT_FUND
+
     def missing_choices(self) -> list[str]:
-        return [name for name in LEAVER_CHOICES if getattr(self, name) is None]
+        return [name for name in REQUIRED_CHOICES if getattr(self, name) is None]
 
     @classmethod
     def parse(cls, raw: dict) -> ConstitutionRules:
@@ -120,7 +136,7 @@ class ConstitutionRules:
             return cls(tiers=tuple(tiers), allow_self_approval=bool(raw.get("allow_self_approval", False)),
                        bank_charges=SharingRule(raw.get("bank_charges", "pro_rata")),
                        interest=SharingRule(raw.get("interest", "pro_rata")), mandate_valid_days=days,
-                       **{name: kind(raw[name]) if raw.get(name) else None for name, kind in LEAVER_CHOICES.items()})
+                       **{name: kind(raw[name]) if raw.get(name) else None for name, kind in REQUIRED_CHOICES.items()})
         except ValueError as exc:
             raise RulesError(str(exc)) from None
 
@@ -130,7 +146,7 @@ class ConstitutionRules:
                            "required": t.required} for t in self.tiers],
             "allow_self_approval": self.allow_self_approval, "bank_charges": self.bank_charges.value,
             "interest": self.interest.value, "mandate_valid_days": self.mandate_valid_days,
-            **{name: getattr(self, name).value for name in LEAVER_CHOICES if getattr(self, name) is not None},
+            **{name: getattr(self, name).value for name in REQUIRED_CHOICES if getattr(self, name) is not None},
         }
 
     def tier_for(self, amount: Money) -> ApprovalTier:

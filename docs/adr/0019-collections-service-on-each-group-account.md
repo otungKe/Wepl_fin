@@ -34,6 +34,9 @@
    - The member code (`M01`) also works.
    - No group code is needed: the account the money goes to already names
      the group.
+   - A fund code may be added (`0712597024 WEL`) to pay into a fund other
+     than the group's default (ADR-0023); the check refuses a code the group
+     does not have.
    - Spaces, `+254` and `#` are ignored. A number inside other words is not
      read as a reference.
 3. **A quoted number names the member paid for**, ahead of the payer's own

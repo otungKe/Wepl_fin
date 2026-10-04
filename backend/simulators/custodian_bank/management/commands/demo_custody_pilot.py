@@ -29,7 +29,8 @@ RULES = {"approvals": [{"up_to": "20000", "approvers": "designated", "required":
                        {"up_to": None, "approvers": "members", "required": 4}],
          "bank_charges": "pro_rata", "interest": "pro_rata", "mandate_valid_days": 14,
          "leaver_balances": "frozen_at_leaving",
-         "leaver_rule_version": "at_leaving", "leaver_payouts": "never"}
+         "leaver_rule_version": "at_leaving", "leaver_payouts": "never",
+         "account_returns": "default_fund"}
 
 
 class Command(BaseCommand):

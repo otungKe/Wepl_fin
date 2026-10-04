@@ -7,12 +7,12 @@ from contexts.shared_kernel.money import Money
 from .domain.capabilities import Capability
 from .domain.lifecycle import InvalidTransition, MandateStatus, ProposalStatus
 from .domain.mandate import MANDATE_REFERENCE, Allocation
-from .domain.rules import (ConstitutionRules, LeaverBalances, LeaverPayouts, LeaverRuleVersion, RulesError,
+from .domain.rules import (AccountReturns, ConstitutionRules, LeaverBalances, LeaverPayouts, LeaverRuleVersion, RulesError,
                            SharingRule)
 
 __all__ = ["Allocation", "Capability", "ConstitutionRules", "GovernanceError", "InvalidTransition", "MANDATE_REFERENCE",
            "MandateStatus", "MandateView", "ProposalStatus", "ProposalView", "RulesError", "SharingRule",
-           "LeaverBalances", "LeaverPayouts", "LeaverRuleVersion"]
+           "AccountReturns", "LeaverBalances", "LeaverPayouts", "LeaverRuleVersion"]
 
 
 class GovernanceError(ValueError):

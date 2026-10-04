@@ -20,7 +20,9 @@ class AccountingError(ValueError):
 
 @dataclass(frozen=True)
 class FundBook:
-    """The ledger accounts of one fund held at one custodian account."""
+    """The ledger accounts of one fund held at one custodian account. Several
+    of a group's funds may be held at its one account (ADR-0023): each has
+    its own cash there, and the account's balance is their sum."""
 
     group_id: int
     fund_id: int
@@ -109,6 +111,21 @@ def payout_explained(book: FundBook, *, key: str, line_id: int, amount: Money, a
                      reference: str) -> JournalDraft:
     debits = _mandate_debits(book, amount, allocation, charged_member_id, member_ids, balances)
     return book.draft(key, "outflow_explained", line_id, [*debits, (book.unexplained(), C, amount)], memo=reference)
+
+
+def payout_explained_elsewhere(held: FundBook, spent: FundBook, *, key: str, line_id: int, amount: Money,
+                               allocation: Allocation, charged_member_id: int | None, member_ids: list[int],
+                               balances: dict[int, Money], reference: str) -> tuple[JournalDraft, JournalDraft]:
+    """An outflow held as unexplained in one fund (the default) turns out to
+    be a mandate spending another fund of the same bank account (ADR-0023).
+    Two entries, one per fund's books: the first fund gets its cash back, the
+    mandate's fund pays. The account's total cash does not move."""
+    back = held.draft(f"{key}:back", "outflow_moved", line_id,
+                      [(held.cash(), D, amount), (held.unexplained(), C, amount)], memo=reference)
+    debits = _mandate_debits(spent, amount, allocation, charged_member_id, member_ids, balances)
+    paid = spent.draft(f"{key}:paid", "outflow_explained", line_id, [*debits, (spent.cash(), C, amount)],
+                       memo=reference)
+    return back, paid
 
 
 def opening_balances(book: FundBook, *, key: str, line_id: int, statement_balance: Money,
