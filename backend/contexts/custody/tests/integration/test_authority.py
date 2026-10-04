@@ -3,6 +3,7 @@ correct its books; a title grants nothing (ADR-0011)
 (guideline: test the unauthorized actor). Every refusal leaves no trace in
 the ledger."""
 from django.test import TestCase
+from django.utils import timezone
 
 from contexts.audit.public import history
 from contexts.communities.infrastructure.models import Membership
@@ -43,7 +44,7 @@ class CorrectionAuthorityTests(TestCase):
         self.assertEqual(self.s.balance_of(treasurer).amount, 700)
 
     def test_a_corrector_who_left_cannot_attribute(self):
-        Membership.objects.filter(pk=self.s.m[0].id).update(status="left")
+        Membership.objects.filter(pk=self.s.m[0].id).update(status="left", left_at=timezone.now())
         self.refused(lambda: attribute_payment(self.line.pk, self.s.m[4].id, by=self.s.m[0].id), "not an active")
 
     def test_another_groups_corrector_is_not_even_visible(self):

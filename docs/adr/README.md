@@ -15,7 +15,7 @@
 | [0011](0011-membership-titles-and-capabilities.md) | Membership, an optional title (a label) and explicit capabilities are separate; a title grants nothing | Proposed (answers Harry's role review) |
 | [0012](0012-membership-is-small.md) | Membership owns only group, status, code and title; Segment describes the group; LEFT is final; member codes are never reused, enforced in PostgreSQL | Proposed (answers Harry's membership review) |
 | [0013](0013-founding-a-group.md) | A group founds its own tenant in one transaction; funds are opened separately; Segment removed; PostgreSQL allocates member codes on every insert | Proposed (follows Harry's application-layer review) |
-| [0014](0014-leaver-balances.md) | Does a leaver's unpaid balance share interest and charges until settled? Today it is frozen by accident; pinned by a test | Direction decided (each group chooses); details open |
+| [0014](0014-leaver-balances.md) | Does a leaver's unpaid balance share interest and charges until settled? Each group chooses in its constitution; judged on the event's date | Direction decided; built on recommended details awaiting confirmation |
 | [0015](0015-fund-lifecycle.md) | A fund is opened, renamed while open, closed only when empty in the ledger, governance and custody, never reopened or deleted | Accepted |
 | [0016](0016-derived-balances-at-scale.md) | Balances stay derived from full history; measured, with indexes RLS can use; checkpoints only past 100,000 lines in a fund | Proposed (follows Harry's measurement request) |
 | [0017](0017-linked-rows-keep-their-tenant.md) | A row and every row it refers to share a tenant: composite foreign keys, plus checks for plain ids installed by the dependent context | **Accepted** (Harry); implemented |

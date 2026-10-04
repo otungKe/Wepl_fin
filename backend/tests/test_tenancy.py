@@ -232,9 +232,9 @@ class ForeignKeysSeeEveryTenantTests(TestCase):
                 connection.cursor() as c, settled(c):
             c.execute("ALTER TABLE communities_membership DROP CONSTRAINT communities_membership_group_id_same_tenant")
             c.execute("ALTER TABLE communities_membership DISABLE TRIGGER communities_membership_allocate")  # also refuses
-            c.execute("""INSERT INTO communities_membership (status, member_code, joined_at, group_id, person_id,
-                                                             tenant_id, title)
-                         SELECT 'left', 'M99', joined_at, %s, person_id, tenant_id, title
+            c.execute("""INSERT INTO communities_membership (status, member_code, joined_at, left_at, group_id,
+                                                             person_id, tenant_id, title)
+                         SELECT 'left', 'M99', joined_at, joined_at, %s, person_id, tenant_id, title
                          FROM communities_membership WHERE id = %s""", [self.b.group.id, self.a.m[0].id])
             c.execute("ALTER TABLE communities_membership ENABLE TRIGGER communities_membership_allocate")
 

@@ -108,6 +108,21 @@ class MembershipTests(TestCase):
         self.refused_by_the_database(lambda: Membership.objects.filter(pk=m.id).update(status="active"))
         self.assertIn("member.left", [e["action"] for e in history(target_type="membership", target_id=m.id)])
 
+    def test_leaving_records_when_and_that_moment_never_changes(self):
+        """ADR-0014: the day a member left decides what they share."""
+        from datetime import timedelta
+        m = self.add(1)
+        self.assertIsNone(m.left_at)
+        leave_group(m.id, actor="t")
+        left_at = members(self.group.id, active_only=False)[0].left_at
+        self.assertIsNotNone(left_at)
+        row = Membership.objects.filter(pk=m.id)
+        self.refused_by_the_database(lambda: row.update(left_at=left_at + timedelta(days=1)))
+        self.refused_by_the_database(lambda: row.update(left_at=None))
+        other = self.add(2)
+        self.refused_by_the_database(lambda: Membership.objects.filter(pk=other.id).update(left_at=left_at))
+        self.refused_by_the_database(lambda: Membership.objects.filter(pk=other.id).update(status="left"))
+
     def test_a_member_who_left_holds_no_capability(self):
         m = self.add(1)
         grant(m.id, Capability.CORRECT_RECORDS, actor="t")

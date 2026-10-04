@@ -1,12 +1,13 @@
 """Gathers the facts an accounting decision needs, and records its outcome."""
 from contexts.communities.public import CommunityError, MembershipView, members, membership
-from contexts.governance.public import ConstitutionRules, current_rules
+from contexts.governance.public import ConstitutionRules, current_rules, rules_in_force
 from contexts.ledger.public import JournalDraft, member_balances, post_journal
 from contexts.shared_kernel.money import Money
 
 from ..contract import CustodyError
 from ..domain.accounting import FundBook
 from ..domain.resolution import Outcome
+from ..domain.sharing import Event, Spell, sharers
 from ..infrastructure.models import ExternalAccount, LineResolution, StatementLine
 
 
@@ -21,12 +22,21 @@ def rules(ea: ExternalAccount) -> ConstitutionRules:
     return r
 
 
-def sharing_facts(ea: ExternalAccount) -> tuple[list[int], dict[int, Money]]:
-    """Who shares interest, bank charges and pro-rata payouts, and their
-    balances. Today: active members only, so a leaver's balance is frozen.
-    That is not yet a decided rule: ADR-0014 is open, and
-    ``LeaverSharingTests`` pins the current behaviour until Harry decides."""
-    return [m.id for m in members(ea.group_id)], member_balances(ea.fund_id, ea.currency)
+def sharing_facts(ea: ExternalAccount, *, at, event: Event) -> tuple[list[int], dict[int, Money]]:
+    """Who shares an event dated ``at``, and their balances (ADR-0014; the
+    rule itself is ``domain.sharing``). A leaver is judged by the group's
+    rule in force on the day they left."""
+    balances = member_balances(ea.fund_id, ea.currency)
+    spells = [Spell(m.id, m.joined_at, m.left_at, _leaver_rule(ea.group_id, m.left_at))
+              for m in members(ea.group_id, active_only=False)]
+    return sharers(spells, at=at, event=event, balances=balances), balances
+
+
+def _leaver_rule(group_id: int, left_at):
+    if left_at is None:
+        return None
+    found = rules_in_force(group_id, left_at)
+    return found[1].leaver_treatment if found else None
 
 
 def amount(line: StatementLine) -> Money:

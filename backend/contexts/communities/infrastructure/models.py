@@ -59,6 +59,8 @@ class Membership(models.Model):
                               default=MembershipStatus.ACTIVE)
     member_code = models.CharField(max_length=8)
     joined_at = models.DateTimeField(auto_now_add=True)
+    # When the spell ended: set exactly when it is left, never changed (0014).
+    left_at = models.DateTimeField(null=True, blank=True, editable=False)
 
     class Meta:
         constraints = [
