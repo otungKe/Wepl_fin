@@ -34,6 +34,11 @@ def entry_fund(entry_id: int) -> int:
     return JournalEntry.objects.values_list("fund_id", flat=True).get(pk=entry_id)
 
 
+def entry_funds(entry_ids) -> dict[int, int]:
+    """The fund of each journal entry named."""
+    return dict(JournalEntry.objects.filter(pk__in=list(entry_ids)).values_list("pk", "fund_id"))
+
+
 def member_balances(fund_id: int, currency: str = "KES") -> dict[int, Money]:
     rows = (JournalLine.objects.filter(account__fund_id=fund_id, account__purpose=AccountPurpose.MEMBER_INTEREST,
                                        account__currency=currency)

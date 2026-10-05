@@ -28,6 +28,7 @@ INSTALLED_APPS = [
     "contexts.governance.infrastructure.apps.GovernanceConfig",
     "contexts.custody.infrastructure.apps.CustodyConfig",
     "contexts.operations.infrastructure.apps.OperationsConfig",
+    "contexts.contributions.infrastructure.apps.ContributionsConfig",
     "contexts.operators.infrastructure.apps.OperatorsConfig",
 ]
 

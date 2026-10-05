@@ -5,6 +5,8 @@ from datetime import datetime
 from contexts.shared_kernel.money import Money
 
 from .domain.capabilities import Capability
+from .domain.contribution import (ContributionRule, ExtraPayments, FineKind, Frequency, JoinersOweFrom, LateFine,
+                                  LeaverArrears, PaymentOrder)
 from .domain.lifecycle import InvalidTransition, MandateStatus, ProposalStatus
 from .domain.mandate import MANDATE_REFERENCE, Allocation
 from .domain.rules import (AccountReturns, ConstitutionRules, LeaverBalances, LeaverPayouts, LeaverRuleVersion, RulesError,
@@ -12,7 +14,9 @@ from .domain.rules import (AccountReturns, ConstitutionRules, LeaverBalances, Le
 
 __all__ = ["Allocation", "Capability", "ConstitutionRules", "GovernanceError", "InvalidTransition", "MANDATE_REFERENCE",
            "MandateStatus", "MandateView", "ProposalStatus", "ProposalView", "RulesError", "SharingRule",
-           "AccountReturns", "LeaverBalances", "LeaverPayouts", "LeaverRuleVersion"]
+           "AccountReturns", "LeaverBalances", "LeaverPayouts", "LeaverRuleVersion",
+           "ContributionRule", "ExtraPayments", "FineKind", "Frequency", "JoinersOweFrom", "LateFine", "LeaverArrears",
+           "PaymentOrder"]
 
 
 class GovernanceError(ValueError):

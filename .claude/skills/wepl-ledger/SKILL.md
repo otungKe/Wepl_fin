@@ -123,3 +123,13 @@ different key. Nothing is ever edited.
 - `contexts/ledger/tests/integration/test_posting.py` (idempotency,
   fingerprint, reversal, and the DB rules exercised by bypassing the domain)
 - `tests/test_properties.py` (books = bank over random histories)
+
+## Contributions and arrears (ADR-0022)
+
+- Each fund's contribution rule is in the group's constitution; every
+  setting is the group's choice, with no WEPL default. Never add a default:
+  add a group choice instead.
+- `contexts/contributions` derives what is due, arrears, paid-ahead amounts
+  and late fines from the rule and the member's pay-ins. It stores no
+  counter and posts no entry. A fine is shown as owed; booking or taking it
+  waits on Harry's decision about where fine money goes.

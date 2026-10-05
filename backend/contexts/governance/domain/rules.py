@@ -6,6 +6,8 @@ from enum import StrEnum
 
 from contexts.shared_kernel.money import Money
 
+from .contribution import ContributionRule, parse_contributions
+
 
 class RulesError(ValueError):
     pass
@@ -85,6 +87,11 @@ class ConstitutionRules:
     leaver_payouts: LeaverPayouts | None = None
     # None only before ADR-0023: everything went to the account's one fund.
     account_returns: AccountReturns | None = None
+    # Each fund's contribution rule (ADR-0022); a fund with none has no schedule.
+    contributions: tuple[ContributionRule, ...] = ()
+
+    def contribution_rule(self, fund_id: int) -> ContributionRule | None:
+        return next((r for r in self.contributions if r.fund_id == fund_id), None)
 
     @property
     def leaver_treatment(self) -> LeaverBalances:
@@ -136,6 +143,7 @@ class ConstitutionRules:
             return cls(tiers=tuple(tiers), allow_self_approval=bool(raw.get("allow_self_approval", False)),
                        bank_charges=SharingRule(raw.get("bank_charges", "pro_rata")),
                        interest=SharingRule(raw.get("interest", "pro_rata")), mandate_valid_days=days,
+                       contributions=parse_contributions(raw.get("contributions")),
                        **{name: kind(raw[name]) if raw.get(name) else None for name, kind in REQUIRED_CHOICES.items()})
         except ValueError as exc:
             raise RulesError(str(exc)) from None
@@ -147,6 +155,7 @@ class ConstitutionRules:
             "allow_self_approval": self.allow_self_approval, "bank_charges": self.bank_charges.value,
             "interest": self.interest.value, "mandate_valid_days": self.mandate_valid_days,
             **{name: getattr(self, name).value for name in REQUIRED_CHOICES if getattr(self, name) is not None},
+            **({"contributions": [r.to_dict() for r in self.contributions]} if self.contributions else {}),
         }
 
     def tier_for(self, amount: Money) -> ApprovalTier:

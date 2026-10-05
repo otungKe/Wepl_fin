@@ -1,8 +1,9 @@
 """Read-only projections for members, the group and the bank. Never a source of truth."""
 from contexts.communities.public import fund_view, group_view, members, membership
-from contexts.ledger.public import fund_position, member_balances, member_movements
+from contexts.ledger.public import entry_funds, fund_position, member_balances, member_movements
 from contexts.shared_kernel.money import Money
 
+from ..domain.resolution import Outcome
 from ..infrastructure.models import Alert, ExternalAccount, LineResolution, StatementLine
 from .reconciliation import account_funds, account_position, latest_reconciliation
 
@@ -59,3 +60,14 @@ def statement_lines(ea_id: int) -> list[dict]:
                     "counterparty_name": line.counterparty_name, "counterparty_msisdn": line.counterparty_msisdn,
                     "outcome": last.outcome if last else None})
     return out
+
+
+def member_pay_ins(fund_id: int, membership_id: int) -> list[tuple]:
+    """Pay-ins credited to a member in a fund, as (the bank's date, amount),
+    oldest first; a payment credited later by a corrector keeps its bank
+    date. Opening balances are not pay-ins (ADR-0022)."""
+    found = list(LineResolution.objects.filter(outcome=Outcome.ATTRIBUTED, membership_id=membership_id)
+                 .select_related("line__external_account").order_by("line__posted_at", "id"))
+    funds = entry_funds(r.journal_entry_id for r in found)
+    return [(r.line.posted_at, Money(r.line.amount, r.line.external_account.currency))
+            for r in found if funds.get(r.journal_entry_id) == fund_id]
