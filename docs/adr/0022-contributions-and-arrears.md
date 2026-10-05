@@ -66,9 +66,9 @@
    member's pay-in to it is booked as the group's money in that fund
    (`retained`, entry kind `fine_payment`), never their share, and is set
    against their fines from every rule naming that fund, oldest first.
-   Proposed, not confirmed: paying more than all fines owed stays in the
-   fines fund as the group's and is shown as `fines_beyond`; returning it
-   is an ordinary approved payout.
+   CONFIRMED (Harry, 2026-10-05, "Okay"): paying more than all fines owed
+   stays in the fines fund as the group's and is shown as `fines_beyond`;
+   returning it is an ordinary approved payout.
 4. **Waivers?** Not built. Proposed: approved like a payout, under the
    group's own approval rules.
 
