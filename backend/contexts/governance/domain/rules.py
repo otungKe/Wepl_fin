@@ -6,7 +6,7 @@ from enum import StrEnum
 
 from contexts.shared_kernel.money import Money
 
-from .contribution import ContributionRule, parse_contributions
+from .contribution import ContributionRule, fines_funds, parse_contributions
 
 
 class RulesError(ValueError):
@@ -92,6 +92,10 @@ class ConstitutionRules:
 
     def contribution_rule(self, fund_id: int) -> ContributionRule | None:
         return next((r for r in self.contributions if r.fund_id == fund_id), None)
+
+    @property
+    def fines_funds(self) -> set[int]:
+        return fines_funds(self.contributions)
 
     @property
     def leaver_treatment(self) -> LeaverBalances:

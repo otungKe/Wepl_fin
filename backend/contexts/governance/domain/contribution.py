@@ -50,9 +50,12 @@ class FineKind(StrEnum):
 
 @dataclass(frozen=True)
 class LateFine:
+    """A fine is an amount owed until paid; it moves no money (Harry,
+    2026-10-05). It is paid into the fund the group names, ``pay_into``."""
     kind: FineKind
     value: Decimal = Decimal(0)
     grace_days: int = 0
+    pay_into: int | None = None
 
 
 @dataclass(frozen=True)
@@ -96,7 +99,8 @@ class ContributionRule:
     def to_dict(self) -> dict:
         fine = {"kind": self.late_fine.kind.value}
         if self.late_fine.kind is not FineKind.NONE:
-            fine |= {"value": str(self.late_fine.value), "grace_days": self.late_fine.grace_days}
+            fine |= {"value": str(self.late_fine.value), "grace_days": self.late_fine.grace_days,
+                     "pay_into": self.late_fine.pay_into}
         return {"fund_id": self.fund_id, "frequency": self.frequency.value, "amount": str(self.amount.amount),
                 "due_day": self.due_day, "starts_on": self.starts_on.isoformat(),
                 "payment_order": self.payment_order.value, "joiners_owe_from": self.joiners_owe_from.value,
@@ -110,12 +114,12 @@ def _fine(raw) -> LateFine:
     kind = FineKind(raw.get("kind"))
     if kind is FineKind.NONE:
         return LateFine(kind)
-    if raw.get("value") in (None, "") or raw.get("grace_days") in (None, ""):
-        raise ContributionError("A late fine must state its value and grace_days.")
+    if any(raw.get(k) in (None, "") for k in ("value", "grace_days", "pay_into")):
+        raise ContributionError("A late fine must state its value, grace_days and pay_into (the fund fines are paid into).")
     value, grace = Decimal(str(raw["value"])), int(raw["grace_days"])
     if value <= 0 or grace < 0 or (kind is FineKind.PERCENT and value > 100):
         raise ContributionError("A fine's value must be above zero (a percentage at most 100), grace_days 0 or more.")
-    return LateFine(kind, value, grace)
+    return LateFine(kind, value, grace, int(raw["pay_into"]))
 
 
 def parse_contributions(raw) -> tuple[ContributionRule, ...]:
@@ -123,4 +127,12 @@ def parse_contributions(raw) -> tuple[ContributionRule, ...]:
     funds = [r.fund_id for r in rules]
     if len(funds) != len(set(funds)):
         raise ContributionError("A fund has at most one contribution rule.")
+    # A pay-in to a fines fund pays fines; one also owed contributions could mean either.
+    if clash := {r.late_fine.pay_into for r in rules} & set(funds):
+        raise ContributionError(f"Fund {min(clash)} takes fines, so it cannot also have a contribution rule.")
     return rules
+
+
+def fines_funds(rules) -> set[int]:
+    """The funds the group named for fines to be paid into."""
+    return {r.late_fine.pay_into for r in rules if r.late_fine.pay_into is not None}

@@ -9,8 +9,10 @@ from contexts.communities.public import CommunityError, fund_view, members, memb
 from contexts.custody.public import member_pay_ins
 from contexts.governance.contract import LeaverArrears
 from contexts.governance.public import rules_history, rules_in_force
+from contexts.shared_kernel.money import Money
 
 from ..contract import ContributionsError, MemberStanding
+from ..domain.fines import settle
 from ..domain.schedule import periods
 from ..domain.standing import standing
 
@@ -29,17 +31,34 @@ def member_standing(membership_id: int, fund_id: int, *, as_of=None) -> MemberSt
     rule = found[1].contribution_rule(fund_id) if found else None
     if rule is None:
         return None
+    s = _standing(m, fund_id, fund.group_id, rule, as_of)
+    zero = Money.zero(rule.amount.currency)
+    paid, beyond = _fines_paid(m, fund.group_id, rule.late_fine.pay_into, found[1], as_of, zero)
+    return MemberStanding(membership_id=m.id, code=m.code, name=m.name, active=m.is_active, fund_id=fund_id,
+                          as_of=as_of, standing=s, fines_paid=paid.get(fund_id, zero), fines_beyond=beyond)
+
+
+def _standing(m, fund_id, group_id, rule, as_of):
     versions = [(timezone.localdate(since), rules.contribution_rule(fund_id))
-                for since, rules in rules_history(fund.group_id)]
+                for since, rules in rules_history(group_id)]
     left_on = timezone.localdate(m.left_at) if m.left_at else None
     until = min(as_of, left_on) if left_on else as_of
     due = periods(versions, joined_on=timezone.localdate(m.joined_at), until=until, upcoming=left_on is None)
     paid = [(timezone.localdate(on), amount) for on, amount in member_pay_ins(fund_id, m.id)
             if timezone.localdate(on) <= as_of]
-    s = standing(due, paid, as_of=until, order=rule.payment_order, extra=rule.extra_payments,
-                 fine=rule.late_fine, write_off=left_on is not None and rule.leaver_arrears is LeaverArrears.WRITTEN_OFF)
-    return MemberStanding(membership_id=m.id, code=m.code, name=m.name, active=m.is_active, fund_id=fund_id,
-                          as_of=as_of, standing=s)
+    return standing(due, paid, as_of=until, order=rule.payment_order, extra=rule.extra_payments,
+                    fine=rule.late_fine, write_off=left_on is not None and rule.leaver_arrears is LeaverArrears.WRITTEN_OFF)
+
+
+def _fines_paid(m, group_id, fines_fund, rules, as_of, zero):
+    """What the member paid into the fines fund, set against the fines of
+    every rule that names it, oldest first."""
+    if fines_fund is None:
+        return {}, zero
+    named = [r for r in rules.contributions if r.late_fine.pay_into == fines_fund]
+    fines = {r.fund_id: _standing(m, r.fund_id, group_id, r, as_of).fines for r in named}
+    paid = sum((a for on, a in member_pay_ins(fines_fund, m.id) if timezone.localdate(on) <= as_of), zero)
+    return settle(fines, paid)
 
 
 def fund_standing(fund_id: int, *, as_of=None) -> list[MemberStanding]:

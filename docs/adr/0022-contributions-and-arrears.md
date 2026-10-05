@@ -39,7 +39,7 @@
    | `payment_order` | `oldest_first` (a payment clears the oldest amount owed first) or `current_first` |
    | `extra_payments` | `pay_ahead` (paying more covers later periods) or `savings` (it does not) |
    | `joiners_owe_from` | `joining` (from the next due date after joining) or `start` (back to `starts_on`) |
-   | `late_fine` | `none`, a fixed amount, or a percentage of the overdue amount, with `grace_days` |
+   | `late_fine` | `none`, a fixed amount, or a percentage of the overdue amount, with `grace_days` and `pay_into` (the group-named fund fines are paid into) |
    | `leaver_arrears` | `written_off` or `deducted_from_payout` |
 
 3. **Arrears are derived, never stored.** For each membership spell: what
@@ -58,8 +58,17 @@
 
 1. **Per fund or whole group?** Per fund, as the template §3 has it.
 2. **Paying more than is due?** A group choice, `extra_payments`.
-3. **Where a paid fine goes?** Not decided. Fines are worked out and shown
-   as owed; nothing is booked or taken for them.
+3. **Where a paid fine goes?** DECIDED (Harry, 2026-10-05): "fines should
+   be payable into a group-named fund. Until payment occurs, they remain an
+   obligation/amount owed and have no effect on cash or fund balances."
+   Built: each fine rule names `pay_into`, an open fund of the group with no
+   contribution rule of its own (so a pay-in there is plainly a fine). A
+   member's pay-in to it is booked as the group's money in that fund
+   (`retained`, entry kind `fine_payment`), never their share, and is set
+   against their fines from every rule naming that fund, oldest first.
+   Proposed, not confirmed: paying more than all fines owed stays in the
+   fines fund as the group's and is shown as `fines_beyond`; returning it
+   is an ordinary approved payout.
 4. **Waivers?** Not built. Proposed: approved like a payout, under the
    group's own approval rules.
 

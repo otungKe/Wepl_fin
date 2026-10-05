@@ -55,6 +55,12 @@ def _leaver_rules(group_id: int, left_at, at_event: ConstitutionRules | None) ->
     return found[1] if found else None
 
 
+def takes_fines(ea: ExternalAccount, fund_id: int) -> bool:
+    """Whether the group named this fund for fines to be paid into (ADR-0022)."""
+    r = current_rules(ea.group_id)
+    return r is not None and fund_id in r.fines_funds
+
+
 def amount(line: StatementLine) -> Money:
     return Money(line.amount, line.external_account.currency)
 

@@ -38,7 +38,8 @@ def attribute_payment(line_id: int, membership_id: int, *, by: int, remember_pay
         count = line.resolutions.count()
         held_in = bk.line_fund(line)  # the fund the pay-in went to (ADR-0023); it stays there
         draft = accounting.payer_identified(bk.book(ea, held_in), key=f"line:{line.pk}:attribute:{count}", line_id=line.pk,
-                                            amount=bk.amount(line), member_id=member.id)
+                                            amount=bk.amount(line), member_id=member.id,
+                                            fine=bk.takes_fines(ea, held_in))
         resolution = bk.post_and_resolve(line, draft, Outcome.ATTRIBUTED, membership_id=member.id, actor=actor,
                                          note="Attributed by a corrector")
         payer = Msisdn.try_parse(line.counterparty_msisdn)

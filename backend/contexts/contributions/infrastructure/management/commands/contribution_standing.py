@@ -28,7 +28,7 @@ class Command(BaseCommand):
                 s = r.standing
                 self.stdout.write(f"  {r.code:5} {r.name[:24]:24} due {s.due.amount:>10} paid {s.paid.amount:>10} "
                                   f"arrears {s.arrears.amount:>10} ahead {s.paid_ahead.amount:>9} "
-                                  f"fines {s.fines_total.amount:>8}"
+                                  f"fines owed {r.fines_owed.amount:>8} paid {r.fines_paid.amount:>8}"
                                   + (f" written off {s.written_off.amount}" if s.written_off.is_positive else "")
                                   + ("" if r.active else " (left)"))
 

@@ -61,7 +61,13 @@ def share_pro_rata(amount: Money, member_ids: list[int], balances: dict[int, Mon
     return amount.allocate(weights)
 
 
-def receipt(book: FundBook, *, key: str, line_id: int, amount: Money, member_id: int | None) -> JournalDraft:
+def receipt(book: FundBook, *, key: str, line_id: int, amount: Money, member_id: int | None,
+            fine: bool = False) -> JournalDraft:
+    """A pay-in. A member's pay-in to the fund the group named for fines pays
+    their fines: it is the group's money in that fund, never their share
+    (Harry, 2026-10-05; ADR-0022). The line's resolution records who paid."""
+    if member_id and fine:
+        return book.draft(key, "fine_payment", line_id, [(book.cash(), D, amount), (book.retained(), C, amount)])
     credit = book.member(member_id) if member_id else book.unattributed()
     kind = "contribution" if member_id else "unattributed_receipt"
     return book.draft(key, kind, line_id, [(book.cash(), D, amount), (credit, C, amount)])
@@ -102,8 +108,10 @@ def unexplained_payout(book: FundBook, *, key: str, line_id: int, amount: Money)
     return book.draft(key, "unexplained_outflow", line_id, [(book.unexplained(), D, amount), (book.cash(), C, amount)])
 
 
-def payer_identified(book: FundBook, *, key: str, line_id: int, amount: Money, member_id: int) -> JournalDraft:
-    return book.draft(key, "attribution", line_id, [(book.unattributed(), D, amount), (book.member(member_id), C, amount)])
+def payer_identified(book: FundBook, *, key: str, line_id: int, amount: Money, member_id: int,
+                     fine: bool = False) -> JournalDraft:
+    credit = book.retained() if fine else book.member(member_id)  # a fine paid is the group's (see ``receipt``)
+    return book.draft(key, "attribution", line_id, [(book.unattributed(), D, amount), (credit, C, amount)])
 
 
 def payout_explained(book: FundBook, *, key: str, line_id: int, amount: Money, allocation: Allocation,

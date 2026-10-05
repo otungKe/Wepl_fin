@@ -86,7 +86,7 @@ def _deposit(ea, line):
                           members=[MemberFacts(m.id, m.code, m.msisdn, m.is_active) for m in group_members],
                           remembered_payers=remembered)
     draft = accounting.receipt(bk.book(ea, fund_id), key=f"line:{line.pk}:receipt", line_id=line.pk, amount=bk.amount(line),
-                               member_id=member_id)
+                               member_id=member_id, fine=bk.takes_fines(ea, fund_id))
     if member_id:
         bk.post_and_resolve(line, draft, Outcome.ATTRIBUTED, membership_id=member_id)
         member = next(m for m in group_members if m.id == member_id)
