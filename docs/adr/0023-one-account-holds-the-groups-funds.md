@@ -1,13 +1,13 @@
 # ADR-0023: One bank account holds all of a group's funds
 
-- **Status:** **Accepted in principle, details Proposed** (2026-10-04).
+- **Status:** **Accepted** (Harry, 2026-10-05: "Accepted").
   - CONFIRMED (Harry, 2026-10-04): a group has only one bank account.
   - CONFIRMED (Harry, on a card, 2026-10-04): "Code, else default". A member
     may add a short fund code to the payment reference; without one, the
     money goes to the fund the group named as its default.
-  - Proposed by Claude, not yet confirmed by Harry: everything else below
-    (how interest and charges split, how an unknown code is treated, how
-    an outflow explained by another fund's mandate is booked).
+  - ACCEPTED (Harry, 2026-10-05): everything else below, which Claude
+    proposed (how interest and charges split, how an unknown code is
+    treated, how an outflow explained by another fund's mandate is booked).
 - **Touches:** ADR-0013 (a group has 0..n funds), ADR-0015 (closing funds
   and accounts), ADR-0019 (the collections reference), ADR-0014 (sharing).
 
@@ -37,7 +37,7 @@
    fund** (`custody/domain/routing.fund_for`). The code is taken out before
    the rest of the reference names the member (ADR-0019), so
    `0712597024 WEL`, `WEL 0712597024` and `M05 WEL` all work.
-   - Proposed: letters that are no open fund's code are ignored and the
+   - Letters that are no open fund's code are ignored and the
      money goes to the default fund (it still belongs to the member and is
      visible). Where the collections service is on, the bank's reference
      check refuses such a reference instead (`/collections/validate`), so
@@ -52,7 +52,7 @@
    - `default_fund`: all of it to the default fund;
    - `by_fund_balance`: split across funds by what each holds at the account
      just before the line. If no fund holds anything, there is nothing to
-     go by and the default fund takes it all (proposed).
+     go by and the default fund takes it all.
 
    Inside each fund, `interest` and `bank_charges` then say who shares it,
    as before. One journal entry and one line resolution per fund.

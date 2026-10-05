@@ -1,8 +1,8 @@
 # ADR-0020: The operator inbox, the daily digest and the nightly run
 
-- **Status:** Proposed (2026-10-04). Harry asked for this step on
-  2026-10-04 ("proceed as suggested"). The design is Claude's
-  recommendation and is accepted only on Harry's word.
+- **Status:** **Accepted** (Harry, 2026-10-05: "Accepted"). Harry asked for this step on
+  2026-10-04 ("proceed as suggested"); the design was Claude's
+  recommendation, built in PR #7.
 - **Touches:**
   - ADR-0002 (a new `operations` context);
   - ADR-0010 (WEPL's operators are not a tenant);

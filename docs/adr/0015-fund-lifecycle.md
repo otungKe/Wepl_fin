@@ -53,7 +53,7 @@ into the others.
 
 This builds the "unlink" step the consequences above left open. The rules
 below are the thread's design; Harry approved building this step
-("Proceed as suggested", 2026-10-04) but has not reviewed the details.
+("Proceed as suggested", 2026-10-04) and accepted the details (2026-10-05).
 
 - **`custody.close_external_account(account, by, confirmed_by)`** records
   that the fund's money is no longer held there. The account row stays;

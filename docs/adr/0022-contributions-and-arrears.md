@@ -1,10 +1,9 @@
 # ADR-0022: Contributions and arrears, as each group decides
 
-- **Status:** **Proposed; first part built** (2026-10-04). Harry's direction
-  (2026-10-04): "All those should be a group decision". Every rule below is
-  a setting the group fills in; WEPL picks none of them. Harry said "Merge
-  and next" without answering the four open questions; the thread built on
-  the answers under "Open questions, as built" (not yet confirmed by Harry).
+- **Status:** **Accepted** (Harry, 2026-10-05: "Accepted"), including the answers under
+  "Open questions, as built" and waivers. Harry's direction (2026-10-04):
+  "All those should be a group decision". Every rule below is a setting the
+  group fills in; WEPL picks none of them.
 - **Builds on:** ADR-0014 (leavers), ADR-0015 (funds), the constitution
   template §3 (each fund has a name, a purpose and a contribution rule).
 
@@ -21,7 +20,7 @@
   grace period), about paying after the pool's *end date*.
 - Leaving: an exit payout of the member's share less any advance owed.
 
-## Decision (proposed)
+## Decision
 
 1. **A contribution rule belongs to a fund, and lives in the constitution.**
    The constitution gets a `contributions` list, one entry per fund (by fund
@@ -54,7 +53,7 @@
    arrears. It reads memberships (communities), the rule (governance) and
    pay-ins (ledger) through their public surfaces, and posts nothing.
 
-## Open questions, as built (Claude's answers; Harry has not confirmed)
+## Open questions, as built (Claude's answers; accepted by Harry 2026-10-05)
 
 1. **Per fund or whole group?** Per fund, as the template §3 has it.
 2. **Paying more than is due?** A group choice, `extra_payments`.
@@ -69,8 +68,7 @@
    CONFIRMED (Harry, 2026-10-05, "Okay"): paying more than all fines owed
    stays in the fines fund as the group's and is shown as `fines_beyond`;
    returning it is an ordinary approved payout.
-4. **Waivers?** Built on Claude's proposal (Harry said "Merge and next"
-   when it was offered; not otherwise confirmed): a waiver of part of one
+4. **Waivers?** Built on Claude's proposal; accepted (Harry, 2026-10-05): a waiver of part of one
    member's arrears or fines in a fund is proposed by an active member and
    decided like a withdrawal: the approval rule for its amount, one vote
    per member, and the member it is for may not approve it (nor the

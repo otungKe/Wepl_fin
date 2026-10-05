@@ -1,9 +1,9 @@
 # ADR-0021: Operator login (WEPL staff)
 
-- **Status:** **Proposed** (2026-10-04). Step 5 of the plan Harry approved
-  ("Proceed as suggested", 2026-10-04). Harry chose **operators first**
-  (2026-10-04). The details below are the thread's proposal and are built;
-  Harry has not accepted them.
+- **Status:** **Accepted** (Harry, 2026-10-05: "Accepted"), with the role names
+  `support`, `onboarding` and `admin` as built. Step 5 of the plan Harry
+  approved ("Proceed as suggested", 2026-10-04). Harry chose **operators
+  first** (2026-10-04).
 - **Builds on:** ADR-0008 (who may act before login), ADR-0009 (tenancy),
   ADR-0011 (capabilities, never titles), ADR-0020 (operator inbox), and the
   `wepl-security` skill's "Rules for when login lands".
@@ -18,7 +18,7 @@
 - Member login needs SMS codes, and the SMS provider is on hold. Operator
   login needs no SMS.
 
-## Decision (proposed)
+## Decision
 
 1. **Operators are their own identity, never members.** A new `operators`
    context owns `Operator`: work email (unique, case-insensitive), name,
@@ -97,7 +97,6 @@
   security review asks for Argon2 (an extra dependency).
 - Where `WEPL_OPERATOR_KEY` lives in production (a secrets manager on the
   host) and how it is rotated.
-- The role names and what each role may do.
 - Member login (phone code, then PIN) waits on the SMS provider.
 
 ## Alternatives
