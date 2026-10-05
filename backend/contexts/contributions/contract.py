@@ -23,7 +23,8 @@ class MemberStanding:
     standing: Standing
     fines_paid: Money = Money.zero()   # paid into the fund the group named for fines
     fines_beyond: Money = Money.zero()  # paid into it beyond every fine owed so far
+    fines_waived: Money = Money.zero()  # forgiven by an approved waiver
 
     @property
     def fines_owed(self) -> Money:
-        return self.standing.fines_total - self.fines_paid
+        return self.standing.fines_total - self.fines_paid - self.fines_waived

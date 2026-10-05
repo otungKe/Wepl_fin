@@ -12,6 +12,7 @@ from contexts.tenancy.contract import TenantScope
 from persistence.tenancy import tenant_column
 
 from ..domain.capabilities import Capability
+from ..domain.contribution import WaiverOf
 from ..domain.lifecycle import MandateStatus, ProposalStatus
 from ..domain.mandate import Allocation, new_reference
 
@@ -126,3 +127,44 @@ class CapabilityChange(models.Model):
 
     class Meta:
         indexes = [models.Index(fields=["membership", "id"])]
+
+
+class Waiver(models.Model):
+    """A request to forgive part of what one member owes a fund: arrears or
+    fines (ADR-0022). Decided like a withdrawal, under the approval rule for
+    its amount, and the member it is for may not approve it. It moves no
+    money; an approved waiver only lowers what the member is shown to owe."""
+
+    tenant_scope = TenantScope.TENANT_SCOPED
+    tenant = tenant_column()
+    group = models.ForeignKey(GROUP, on_delete=models.PROTECT, related_name="+")
+    fund = models.ForeignKey(FUND, on_delete=models.PROTECT, related_name="+")
+    member = models.ForeignKey(MEMBERSHIP, on_delete=models.PROTECT, related_name="+")
+    constitution = models.ForeignKey(Constitution, on_delete=models.PROTECT, related_name="+")
+    proposed_by = models.ForeignKey(MEMBERSHIP, on_delete=models.PROTECT, related_name="+")
+    owed = models.CharField(max_length=10, choices=_choices(WaiverOf))
+    amount = models.DecimalField(max_digits=18, decimal_places=2)
+    currency = models.CharField(max_length=3, default="KES")
+    reason = models.CharField(max_length=200)
+    approvers = models.CharField(max_length=10)
+    required_approvals = models.PositiveSmallIntegerField()
+    status = models.CharField(max_length=10, choices=_choices(ProposalStatus), default=ProposalStatus.OPEN)
+    created_at = models.DateTimeField(auto_now_add=True)
+    decided_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [models.CheckConstraint(condition=Q(amount__gt=0), name="gov_waiver_amount_positive")]
+        indexes = [models.Index(fields=["fund", "member", "status"])]
+
+
+class WaiverVote(models.Model):
+    tenant_scope = TenantScope.TENANT_SCOPED
+    tenant = tenant_column()
+    waiver = models.ForeignKey(Waiver, on_delete=models.PROTECT, related_name="votes")
+    membership = models.ForeignKey(MEMBERSHIP, on_delete=models.PROTECT, related_name="+")
+    approve = models.BooleanField()
+    source = models.CharField(max_length=20, default="app")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["waiver", "membership"], name="gov_one_waiver_vote")]

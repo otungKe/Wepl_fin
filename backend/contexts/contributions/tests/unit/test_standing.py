@@ -114,3 +114,18 @@ class FineSettlementTests(SimpleTestCase):
         self.assertEqual(settle(fines, K("100")), ({1: K("70"), 2: K("30")}, K("0")))
         self.assertEqual(settle(fines, K("200")), ({1: K("100"), 2: K("30")}, K("70")))
         self.assertEqual(settle(fines, K("0")), ({1: K("0"), 2: K("0")}, K("0")))
+
+
+class WaiverTests(SimpleTestCase):
+    def test_a_waiver_forgives_only_what_was_due_by_its_date_and_never_pays_ahead(self):
+        s = standing(DUE, [], as_of=d(9, 20), order=PaymentOrder.OLDEST_FIRST, extra=ExtraPayments.PAY_AHEAD,
+                     fine=NO_FINE, waivers=[(d(8, 10), K("5000"))])
+        self.assertEqual((s.waived, s.arrears, s.paid_ahead), (K("2000"), K("1000"), K("0")))
+        self.assertEqual(s.overdue, ((d(9, 5), K("1000")),))
+
+    def test_a_fine_already_incurred_stays_when_arrears_are_waived_later(self):
+        fine = LateFine(FineKind.FIXED, K("50").amount, 3)
+        s = standing(DUE, [], as_of=d(9, 20), order=PaymentOrder.OLDEST_FIRST, extra=ExtraPayments.SAVINGS,
+                     fine=fine, waivers=[(d(7, 6), K("1000"))])  # within July's grace: no July fine
+        self.assertEqual(s.fines, ((d(8, 5), K("50")), (d(9, 5), K("50"))))
+        self.assertEqual((s.waived, s.paid), (K("1000"), K("0")))

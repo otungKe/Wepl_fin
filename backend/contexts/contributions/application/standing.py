@@ -7,8 +7,8 @@ from django.utils import timezone
 
 from contexts.communities.public import CommunityError, fund_view, members, membership
 from contexts.custody.public import member_pay_ins
-from contexts.governance.contract import LeaverArrears
-from contexts.governance.public import rules_history, rules_in_force
+from contexts.governance.contract import LeaverArrears, WaiverOf
+from contexts.governance.public import approved_waivers, rules_history, rules_in_force
 from contexts.shared_kernel.money import Money
 
 from ..contract import ContributionsError, MemberStanding
@@ -34,8 +34,18 @@ def member_standing(membership_id: int, fund_id: int, *, as_of=None) -> MemberSt
     s = _standing(m, fund_id, fund.group_id, rule, as_of)
     zero = Money.zero(rule.amount.currency)
     paid, beyond = _fines_paid(m, fund.group_id, rule.late_fine.pay_into, found[1], as_of, zero)
+    fines_paid = paid.get(fund_id, zero)
+    forgiven = sum((a for _, a in _waivers(fund_id, m.id, WaiverOf.FINES, as_of)), zero)
+    unpaid = s.fines_total - fines_paid
     return MemberStanding(membership_id=m.id, code=m.code, name=m.name, active=m.is_active, fund_id=fund_id,
-                          as_of=as_of, standing=s, fines_paid=paid.get(fund_id, zero), fines_beyond=beyond)
+                          as_of=as_of, standing=s, fines_paid=fines_paid, fines_beyond=beyond,
+                          fines_waived=forgiven if forgiven <= unpaid else unpaid)
+
+
+def _waivers(fund_id, member_id, owed, as_of) -> list:
+    """Approved waivers of this kind decided by ``as_of``, dated by their decision."""
+    return [(timezone.localdate(w.decided_at), w.amount) for w in approved_waivers(fund_id, member_id)
+            if w.owed is owed and timezone.localdate(w.decided_at) <= as_of]
 
 
 def _standing(m, fund_id, group_id, rule, as_of):
@@ -47,7 +57,8 @@ def _standing(m, fund_id, group_id, rule, as_of):
     paid = [(timezone.localdate(on), amount) for on, amount in member_pay_ins(fund_id, m.id)
             if timezone.localdate(on) <= as_of]
     return standing(due, paid, as_of=until, order=rule.payment_order, extra=rule.extra_payments,
-                    fine=rule.late_fine, write_off=left_on is not None and rule.leaver_arrears is LeaverArrears.WRITTEN_OFF)
+                    fine=rule.late_fine, write_off=left_on is not None and rule.leaver_arrears is LeaverArrears.WRITTEN_OFF,
+                    waivers=_waivers(fund_id, m.id, WaiverOf.ARREARS, as_of))
 
 
 def _fines_paid(m, group_id, fines_fund, rules, as_of, zero):
