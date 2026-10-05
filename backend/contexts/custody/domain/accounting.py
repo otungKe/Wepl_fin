@@ -8,7 +8,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from contexts.governance.contract import Allocation, SharingRule
-from contexts.ledger.contract import AccountKey, AccountPurpose, JournalDraft, Side
+from contexts.ledger.contract import (TRANSFER_IN, TRANSFER_OUT, AccountKey, AccountPurpose, FundTransfer, JournalDraft,
+                                     Side)
 from contexts.shared_kernel.money import Money
 
 D, C = Side.DEBIT, Side.CREDIT
@@ -47,10 +48,10 @@ class FundBook:
     def retained(self) -> AccountKey:
         return self._key(AccountPurpose.RETAINED)
 
-    def draft(self, key: str, kind: str, cause_id, postings, memo: str = "") -> JournalDraft:
+    def draft(self, key: str, kind: str, cause_id, postings, memo: str = "",
+              cause_type: str = "custody.statement_line") -> JournalDraft:
         return JournalDraft.build(idempotency_key=key, group_id=self.group_id, fund_id=self.fund_id, kind=kind,
-                                  cause_type="custody.statement_line", cause_id=str(cause_id), postings=postings,
-                                  memo=memo)
+                                  cause_type=cause_type, cause_id=str(cause_id), postings=postings, memo=memo)
 
 
 def share_pro_rata(amount: Money, member_ids: list[int], balances: dict[int, Money]) -> dict[int, Money]:
@@ -149,3 +150,37 @@ def opening_balances(book: FundBook, *, key: str, line_id: int, statement_balanc
     return book.draft(key, "opening", line_id, [(book.cash(), D, statement_balance), *credits,
                                                 (book.unattributed(), C, statement_balance - total)],
                       memo="Opening balances")
+
+
+def fund_transfer(source: FundBook, destination: FundBook, *, transfer_id: int, members: dict[int, Money],
+                  retained: Money | None, memo_out: str, memo_in: str) -> FundTransfer:
+    """Money the group decided to move between two of its funds at the same
+    bank account (ADR-0024). The owners keep it: each member's share, or the
+    group's own money, leaves the source fund and arrives in the destination
+    for the same owner. The account's total does not move."""
+    if source.external_account_id != destination.external_account_id:
+        raise AccountingError("Money moves between funds held at the same bank account.")
+    if bool(members) == (retained is not None):
+        raise AccountingError("A transfer moves either members' money or the group's, not both and not neither.")
+    total = retained if retained is not None else sum(members.values(), Money.zero(source.currency))
+    take = ([(source.retained(), D, retained)] if retained is not None
+            else [(source.member(m), D, a) for m, a in members.items()])
+    give = ([(destination.retained(), C, retained)] if retained is not None
+            else [(destination.member(m), C, a) for m, a in members.items()])
+    cause = dict(cause_id=transfer_id, cause_type="governance.fund_transfer")
+    return FundTransfer(
+        out=source.draft(f"fund_transfer:{transfer_id}:out", TRANSFER_OUT, postings=[*take, (source.cash(), C, total)],
+                         memo=memo_out, **cause),
+        into=destination.draft(f"fund_transfer:{transfer_id}:in", TRANSFER_IN, memo=memo_in,
+                               postings=[(destination.cash(), D, total), *give], **cause))
+
+
+def transfer_shares(amount: Money, sharer_ids: list[int], balances: dict[int, Money]) -> dict[int, Money]:
+    """A pro-rata transfer: each sharing member gives in proportion to what
+    they hold in the source fund, and never more than they hold. Call only
+    once the sharers are known to hold at least ``amount`` together."""
+    holders = [m for m in sharer_ids if balances.get(m, Money.zero(amount.currency)).is_positive]
+    shares = share_pro_rata(amount, holders, balances)
+    if any(balances[m] < a for m, a in shares.items()):
+        raise AccountingError("A pro-rata transfer would take more than a member holds.")
+    return shares

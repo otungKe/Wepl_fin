@@ -105,6 +105,21 @@ reconciles; the alert is the control, not the reconciliation.
   fails loudly; collections calls are refused.
 - The fund's close trigger counts only accounts that are still open.
 
+## Moving money between funds (ADR-0024)
+
+- Governance decides it (`propose_fund_transfer`, like a payout); custody
+  books it with `book_fund_transfer`, under the lock of the group's open
+  account, and the nightly `book_fund_transfers` books any approval still
+  waiting.
+- `accounting.fund_transfer` builds the pair: the source fund's owners give
+  and its cash at the account goes down; the destination's cash at the same
+  account goes up and the same owners receive the same amounts.
+- Pro-rata takes the members who would share a pro-rata payout
+  (`sharing_facts`, `Event.PAYOUT`), by their balances when booked.
+- If the money is no longer there (`governance.contract.shortfall`, counting
+  issued mandates and other approved transfers), the transfer fails and
+  nothing posts. A transfer is not a pay-in: arrears never see it.
+
 ## Sharing and leavers (ADR-0014)
 
 - `domain/sharing.py` decides who shares an event, judged on the line's

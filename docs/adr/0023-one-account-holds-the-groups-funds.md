@@ -79,8 +79,9 @@
 ## Consequences
 
 - Members must be told each fund's code. A pay-in without one, or with a
-  mistyped one, goes to the default fund; moving money between funds later
-  is a group decision and not built (no "move between funds" correction).
+  mistyped one, goes to the default fund. Moving money between funds is a
+  group decision, built by ADR-0024. Re-routing a mistyped pay-in to its
+  fund is a separate correction and not built.
 - The default fund cannot close while the account is open (custody 0007
   trigger, unchanged). Any other fund closes once it holds nothing.
 - Opening balances are brought in to the default fund.

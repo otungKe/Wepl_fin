@@ -106,11 +106,15 @@ class IntegrityCheck(models.Model):
     invariant_holds = models.BooleanField()
     passed = models.BooleanField()
     lines = models.PositiveBigIntegerField()  # the fund's history: what ADR-0016's threshold watches
+    # Fund-transfer entries of this fund whose other half is missing (ADR-0024).
+    # PostgreSQL refuses such a commit (ledger 0009); this watches for a bypass.
+    unpaired_transfers = models.PositiveIntegerField(default=0)
     checked_at = models.DateTimeField(auto_now_add=True)
     operation_id = models.CharField(max_length=64, blank=True, default="")
 
     class Meta:
         indexes = [models.Index(fields=["fund_id", "id"])]
-        constraints = [models.CheckConstraint(  # "passed" can only mean both checks held
-            condition=Q(passed=True, trial_balance=0, invariant_holds=True)
-            | (Q(passed=False) & ~Q(trial_balance=0, invariant_holds=True)), name="ledger_check_passed_means_both")]
+        constraints = [models.CheckConstraint(  # "passed" can only mean every check held
+            condition=Q(passed=True, trial_balance=0, invariant_holds=True, unpaired_transfers=0)
+            | (Q(passed=False) & ~Q(trial_balance=0, invariant_holds=True, unpaired_transfers=0)),
+            name="ledger_check_passed_means_all")]

@@ -32,6 +32,12 @@ Integrity is enforced at several layers (rule 47):
   two-line minimum at commit. A CHECK constraint requires amounts > 0.
   Triggers reject UPDATE, DELETE and TRUNCATE on accounts, entries and lines.
 
+An operation that spans funds is a set of single-fund entries under one
+cause; the one-fund rule stays. The one such operation the ledger knows is a
+fund transfer (ADR-0024): a mirrored pair posted together by
+`post_transfer`, checked as a pair at commit (ledger 0009), and never
+reversed.
+
 Corrections are reversals or new entries, never edits (rule 19). Balances are
 always derived from the journal, never stored (rules 18, 27).
 

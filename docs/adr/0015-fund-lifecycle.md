@@ -29,6 +29,7 @@ into the others.
 |---|---|---|
 | Nothing is held: every ledger account of the fund is at zero, in every currency | ledger | `close_fund` asks `ledger.public.fund_holds_nothing` under the fund's row lock |
 | No open proposal and no unexecuted (issued) mandate | governance | a trigger on closing (governance 0005). A new proposal takes a share lock on its fund, so it and closing serialise. |
+| No fund transfer naming it that is open, or approved but not booked (ADR-0024) | governance | the same trigger (governance 0009). A new transfer takes a share lock on both funds. |
 | No linked custodian account that is still open | custody | a trigger on closing (custody 0004, 0007). Linking takes a share lock on the fund. |
 
 **Consequences:**

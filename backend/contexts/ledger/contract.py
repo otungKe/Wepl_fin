@@ -2,6 +2,7 @@
 from .domain.accounts import AccountKey, AccountKeyError, AccountPurpose, Side
 from .domain.journal import JournalDraft, LedgerError, Posting
 from .domain.position import FundPosition
+from .domain.transfer import TRANSFER_IN, TRANSFER_OUT, FundTransfer
 
-__all__ = ["AccountKey", "AccountKeyError", "AccountPurpose", "FundPosition", "JournalDraft", "LedgerError",
+__all__ = ["TRANSFER_IN", "TRANSFER_OUT", "FundTransfer", "AccountKey", "AccountKeyError", "AccountPurpose", "FundPosition", "JournalDraft", "LedgerError",
            "Posting", "Side"]

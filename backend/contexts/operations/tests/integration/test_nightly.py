@@ -41,7 +41,8 @@ class NightlyTests(TestCase):
                         side_effect=RuntimeError("database gone")):
             steps, _ = run_nightly()
         outcome = {s.name: s.ok for s in steps}
-        self.assertEqual(outcome, {"sync_accounts": True, "check_ledger_integrity": False, "deliver_outbox": True})
+        self.assertEqual(outcome, {"sync_accounts": True, "book_fund_transfers": True, "check_ledger_integrity": False,
+                                   "deliver_outbox": True})
         self.assertIn("JOBS FAILED (check_ledger_integrity)", mail.outbox[0].subject)
 
     def test_an_account_the_nightly_job_missed_shows_as_not_reconciled(self):

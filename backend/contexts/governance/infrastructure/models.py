@@ -13,8 +13,9 @@ from persistence.tenancy import tenant_column
 
 from ..domain.capabilities import Capability
 from ..domain.contribution import WaiverOf
-from ..domain.lifecycle import MandateStatus, ProposalStatus
+from ..domain.lifecycle import MandateStatus, ProposalStatus, TransferStatus
 from ..domain.mandate import Allocation, new_reference
+from ..domain.transfer import TransferFrom
 
 GROUP, FUND, MEMBERSHIP = "communities.Group", "communities.Fund", "communities.Membership"
 
@@ -168,3 +169,62 @@ class WaiverVote(models.Model):
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=["waiver", "membership"], name="gov_one_waiver_vote")]
+
+
+class FundTransfer(models.Model):
+    """A request to move money from one of the group's funds to another
+    (ADR-0024). Decided like a withdrawal, then booked by custody: the same
+    owners hold the money afterwards, in the other fund. ``out_entry_id`` and
+    ``in_entry_id`` are the ledger's two entries (plain ids, ADR-0004)."""
+
+    tenant_scope = TenantScope.TENANT_SCOPED
+    tenant = tenant_column()
+    group = models.ForeignKey(GROUP, on_delete=models.PROTECT, related_name="+")
+    from_fund = models.ForeignKey(FUND, on_delete=models.PROTECT, related_name="+")
+    to_fund = models.ForeignKey(FUND, on_delete=models.PROTECT, related_name="+")
+    constitution = models.ForeignKey(Constitution, on_delete=models.PROTECT, related_name="+")
+    request_key = models.CharField(max_length=80, null=True, blank=True)  # unique per tenant
+    proposed_by = models.ForeignKey(MEMBERSHIP, on_delete=models.PROTECT, related_name="+")
+    source = models.CharField(max_length=10, choices=_choices(TransferFrom))
+    member = models.ForeignKey(MEMBERSHIP, null=True, blank=True, on_delete=models.PROTECT, related_name="+")
+    amount = models.DecimalField(max_digits=18, decimal_places=2)
+    currency = models.CharField(max_length=3, default="KES")
+    reason = models.CharField(max_length=200)
+    approvers = models.CharField(max_length=10)
+    required_approvals = models.PositiveSmallIntegerField()
+    status = models.CharField(max_length=10, choices=_choices(TransferStatus), default=TransferStatus.OPEN)
+    created_at = models.DateTimeField(auto_now_add=True)
+    decided_at = models.DateTimeField(null=True, blank=True)
+    settled_at = models.DateTimeField(null=True, blank=True)  # booked or failed
+    out_entry_id = models.BigIntegerField(null=True, blank=True)
+    in_entry_id = models.BigIntegerField(null=True, blank=True)
+    failure = models.CharField(max_length=255, blank=True, default="")
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(condition=Q(amount__gt=0), name="gov_transfer_amount_positive"),
+            models.CheckConstraint(condition=~Q(from_fund=models.F("to_fund")), name="gov_transfer_two_funds"),
+            models.CheckConstraint(condition=Q(source="member", member__isnull=False)
+                                   | (~Q(source="member") & Q(member__isnull=True)),
+                                   name="gov_transfer_member_iff_member_source"),
+            models.CheckConstraint(condition=~Q(status="booked")
+                                   | Q(out_entry_id__isnull=False, in_entry_id__isnull=False),
+                                   name="gov_booked_transfer_has_entries"),
+            models.UniqueConstraint(fields=["tenant", "request_key"], name="gov_transfer_request_key_unique"),
+        ]
+        # The request-key lookup, for the reason given on the outbox (ADR-0016).
+        indexes = [models.Index(fields=["request_key"], name="gov_transfer_request_key"),
+                   models.Index(fields=["status", "id"]), models.Index(fields=["from_fund", "status"])]
+
+
+class TransferVote(models.Model):
+    tenant_scope = TenantScope.TENANT_SCOPED
+    tenant = tenant_column()
+    transfer = models.ForeignKey(FundTransfer, on_delete=models.PROTECT, related_name="votes")
+    membership = models.ForeignKey(MEMBERSHIP, on_delete=models.PROTECT, related_name="+")
+    approve = models.BooleanField()
+    source = models.CharField(max_length=20, default="app")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["transfer", "membership"], name="gov_one_transfer_vote")]

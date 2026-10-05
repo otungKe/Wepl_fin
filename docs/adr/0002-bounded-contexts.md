@@ -17,9 +17,9 @@ other's models directly, and kept rules in `services.py` files.
 |---|---|---|
 | `identity` | People and phone numbers | Roles in groups; authentication (later) |
 | `communities` | Groups (each founds its own tenant, ADR-0013), memberships and titles, funds | Rules, approvals, balances, custody |
-| `governance` | Constitutions, proposals, approvals, mandates | Moving money, balances, members |
+| `governance` | Constitutions, proposals, approvals, mandates, decisions to move money between funds (ADR-0024) | Moving money, balances, members |
 | `ledger` | Accounts, journal entries, derived balances | Why money moved; who anyone is |
-| `custody` | Custodian accounts, statement lines, how each was accounted for, alerts, reconciliation | The money, mandates, the journal |
+| `custody` | Custodian accounts, statement lines, how each was accounted for, alerts, reconciliation, booking approved moves between funds held at the same account (ADR-0024) | The money, mandates, the journal |
 | `notifications` | Messages decided on (outbox) and their delivery | Deciding what is worth saying |
 | `audit` | Accountability records and operation ids | Operational logs |
 | `operations` | The operator inbox, the daily digest and the nightly run (ADR-0020) | The problems it reports; resolving them; who in a group is told |

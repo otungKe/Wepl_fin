@@ -6,6 +6,7 @@ from contexts.shared_kernel.money import Money
 
 from ..domain.accounts import AccountKey, AccountPurpose, Side
 from ..domain.journal import JournalDraft, LedgerError, Posting
+from ..domain.transfer import TRANSFER_KINDS, FundTransfer
 from ..infrastructure import accounts
 from ..infrastructure.models import JournalEntry, JournalLine
 
@@ -17,6 +18,20 @@ def post_journal(draft: JournalDraft) -> int:
     """Post a valid entry and return its id. Posting the same idempotency key
     again returns the first entry, so a retry or a duplicate notification can
     never double-post; reusing a key for a *different* entry is refused."""
+    if draft.kind in TRANSFER_KINDS:
+        raise LedgerError("A fund transfer's entries are posted together, with post_transfer.")
+    return _post(draft)
+
+
+@transaction.atomic  # both entries or neither; PostgreSQL checks the pair at commit (ledger 0009)
+def post_transfer(transfer: FundTransfer) -> tuple[int, int]:
+    """Post a move between two funds of one group (ADR-0024): the source
+    fund's entry and the destination's, together. Idempotent like
+    ``post_journal``: a retry returns the same two entries."""
+    return _post(transfer.out), _post(transfer.into)
+
+
+def _post(draft: JournalDraft) -> int:
     existing = JournalEntry.objects.filter(idempotency_key=draft.idempotency_key).first()
     if existing:
         return _replay(existing, draft)
@@ -64,7 +79,12 @@ def load_draft(entry_id: int) -> JournalDraft:
 
 
 def reverse_journal(entry_id: int, *, idempotency_key: str, memo: str = "") -> int:
-    """Post the mirror image of an entry. The original is never touched."""
+    """Post the mirror image of an entry. The original is never touched.
+    A fund transfer's entries are never reversed: the group moves the money
+    back with a new transfer (ADR-0024)."""
     if JournalEntry.objects.filter(reverses_id=entry_id).exclude(idempotency_key=idempotency_key).exists():
         raise LedgerError(f"Entry {entry_id} has already been reversed.")
-    return post_journal(load_draft(entry_id).reversal(entry_id=entry_id, idempotency_key=idempotency_key, memo=memo))
+    original = load_draft(entry_id)
+    if original.kind in TRANSFER_KINDS:
+        raise LedgerError(f"Entry {entry_id} is half of a fund transfer; move the money back with a new transfer.")
+    return post_journal(original.reversal(entry_id=entry_id, idempotency_key=idempotency_key, memo=memo))
