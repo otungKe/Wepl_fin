@@ -15,13 +15,13 @@ def adopt_constitution(group_id: int, rules: dict, *, actor: str) -> int:
     if missing := parsed.missing_choices():  # no defaults: the group chooses (ADR-0014, ADR-0023)
         raise RulesError("The constitution must state the group's own choice for "
                          + "; ".join(f"{n} (one of {[v.value for v in REQUIRED_CHOICES[n]]})" for n in missing) + ".")
-    for rule in parsed.contributions:  # ADR-0022: only the group's own open funds
+    for fund_id in {r.fund_id for r in parsed.contributions} | parsed.fines_funds:  # ADR-0022: the group's open funds
         try:
-            fund = fund_view(rule.fund_id)
+            fund = fund_view(fund_id)
         except CommunityError:
             fund = None
         if fund is None or fund.group_id != group_id or not fund.is_open:
-            raise RulesError(f"Fund {rule.fund_id} is not an open fund of this group; it cannot have a contribution rule.")
+            raise RulesError(f"Fund {fund_id} is not an open fund of this group; a contribution rule cannot name it.")
     latest = Constitution.objects.select_for_update().filter(group_id=group_id).order_by("-version").first()
     version = latest.version + 1 if latest else 1
     c = Constitution.objects.create(group_id=group_id, version=version, rules=parsed.to_dict(), adopted_by=actor)

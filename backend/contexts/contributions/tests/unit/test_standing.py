@@ -2,6 +2,7 @@ from datetime import date
 
 from django.test import SimpleTestCase
 
+from contexts.contributions.domain.fines import settle
 from contexts.contributions.domain.schedule import due_dates, owed_from, periods
 from contexts.contributions.domain.standing import standing
 from contexts.governance.contract import (ContributionRule, ExtraPayments, FineKind, JoinersOweFrom, LateFine,
@@ -11,7 +12,7 @@ from contexts.shared_kernel.money import Money
 
 RAW = {"fund_id": 1, "frequency": "monthly", "amount": "1000", "due_day": 5, "starts_on": "2026-07-01",
        "payment_order": "oldest_first", "joiners_owe_from": "joining", "extra_payments": "pay_ahead",
-       "late_fine": {"kind": "fixed", "value": "50", "grace_days": 3}, "leaver_arrears": "written_off"}
+       "late_fine": {"kind": "fixed", "value": "50", "grace_days": 3, "pay_into": 9}, "leaver_arrears": "written_off"}
 RULE = ContributionRule.parse(RAW)
 NO_FINE = LateFine(FineKind.NONE)
 K = Money
@@ -27,8 +28,9 @@ class RuleTests(SimpleTestCase):
         for name in ("frequency", "amount", "payment_order", "extra_payments", "late_fine", "leaver_arrears"):
             with self.subTest(name), self.assertRaises(ValueError):
                 ContributionRule.parse({k: v for k, v in RAW.items() if k != name})
-        for bad in ({"due_day": 29}, {"amount": "0"}, {"late_fine": {"kind": "percent", "value": "150",
-                                                                     "grace_days": 1}}):
+        for bad in ({"due_day": 29}, {"amount": "0"},
+                    {"late_fine": {"kind": "percent", "value": "150", "grace_days": 1, "pay_into": 9}},
+                    {"late_fine": {"kind": "fixed", "value": "50", "grace_days": 1}}):  # names no fund to pay into
             with self.subTest(bad), self.assertRaises(ValueError):
                 ContributionRule.parse({**RAW, **bad})
 
@@ -37,6 +39,9 @@ class RuleTests(SimpleTestCase):
         self.assertEqual(ConstitutionRules.parse({**base, "contributions": [RAW]}).contribution_rule(1), RULE)
         with self.assertRaises(RulesError):
             ConstitutionRules.parse({**base, "contributions": [RAW, RAW]})
+        with self.assertRaisesMessage(RulesError, "takes fines"):  # a fines fund owes no contributions
+            ConstitutionRules.parse({**base, "contributions": [RAW, {**RAW, "fund_id": 9}]})
+        self.assertEqual(ConstitutionRules.parse({**base, "contributions": [RAW]}).fines_funds, {9})
 
 
 class ScheduleTests(SimpleTestCase):
@@ -101,3 +106,11 @@ class StandingTests(SimpleTestCase):
     def test_a_leavers_arrears_are_written_off_when_the_group_says_so(self):
         s = run([], fine=LateFine(FineKind.FIXED, K("50").amount, 0), write_off=True)
         self.assertEqual((s.arrears, s.fines, s.written_off), (K("0"), (), K("3150")))
+
+
+class FineSettlementTests(SimpleTestCase):
+    def test_payments_into_the_fines_fund_settle_the_oldest_fines_first(self):
+        fines = {1: ((d(8, 5), K("50")), (d(9, 5), K("50"))), 2: ((d(8, 1), K("30")),)}
+        self.assertEqual(settle(fines, K("100")), ({1: K("70"), 2: K("30")}, K("0")))
+        self.assertEqual(settle(fines, K("200")), ({1: K("100"), 2: K("30")}, K("70")))
+        self.assertEqual(settle(fines, K("0")), ({1: K("0"), 2: K("0")}, K("0")))

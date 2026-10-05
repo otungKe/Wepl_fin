@@ -131,5 +131,7 @@ different key. Nothing is ever edited.
   add a group choice instead.
 - `contexts/contributions` derives what is due, arrears, paid-ahead amounts
   and late fines from the rule and the member's pay-ins. It stores no
-  counter and posts no entry. A fine is shown as owed; booking or taking it
-  waits on Harry's decision about where fine money goes.
+  counter and posts no entry. A fine is owed until paid and moves no money
+  (Harry, 2026-10-05). It is paid into the fund the rule names (`pay_into`):
+  custody books such a pay-in as `fine_payment` to that fund's `retained`,
+  never to the member's share.

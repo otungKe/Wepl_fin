@@ -10,6 +10,8 @@ from django.utils import timezone
 from contexts.communities.public import open_fund
 from contexts.contributions.public import fund_standing, member_standing
 from contexts.governance.public import RulesError, adopt_constitution
+from contexts.custody.public import reconcile
+from contexts.ledger.public import fund_position, member_balances
 from contexts.shared_kernel.money import Money
 from simulators.custodian_bank import bank
 from simulators.custodian_bank.models import SimTransaction
@@ -24,10 +26,12 @@ class StandingTests(TestCase):
         self.enterContext(self.s.acting())
         self.base = timezone.localdate()
         self.welfare = open_fund(self.s.group.id, name="Welfare", code="WEL", actor="test")
+        self.fines = open_fund(self.s.group.id, name="Fines", code="FIN", actor="test")
         self.rule = {"fund_id": self.s.fund.id, "frequency": "weekly", "amount": "1000",
                      "due_day": (self.base + timedelta(days=1)).isoweekday(), "starts_on": self.base.isoformat(),
                      "payment_order": "oldest_first", "joiners_owe_from": "start", "extra_payments": "pay_ahead",
-                     "late_fine": {"kind": "fixed", "value": "50", "grace_days": 2}, "leaver_arrears": "written_off"}
+                     "late_fine": {"kind": "fixed", "value": "50", "grace_days": 2,
+                                   "pay_into": self.fines.id}, "leaver_arrears": "written_off"}
         adopt_constitution(self.s.group.id, {**RULES, "contributions": [self.rule]}, actor="test")
 
     def pay(self, member, amount, day, reference=""):
@@ -56,3 +60,23 @@ class StandingTests(TestCase):
         with self.assertRaisesMessage(RulesError, "not an open fund of this group"):
             adopt_constitution(self.s.group.id, {**RULES, "contributions": [{**self.rule, "fund_id": 999999}]},
                                actor="test")
+
+    def test_a_fine_is_owed_until_paid_into_the_fund_the_group_named(self):
+        """Harry, 2026-10-05: a fine has no effect on cash or balances until it is paid."""
+        m = self.s.m
+        self.pay(m[0], "1000", 0)  # week one on time; weeks two and three missed: two fines of 50
+        self.s.sync()
+        as_of = self.base + timedelta(days=20)
+        before = member_standing(m[0].id, self.s.fund.id, as_of=as_of)
+        self.assertEqual((before.standing.fines_total, before.fines_owed), (Money("100"), Money("100")))
+        self.assertEqual(fund_position(self.fines.id).cash, Money("0"))  # owed, not booked
+        self.pay(m[0], "60", 18, reference="FIN")
+        self.s.sync()
+        after = member_standing(m[0].id, self.s.fund.id, as_of=as_of)
+        self.assertEqual((after.fines_paid, after.fines_owed, after.standing.arrears),
+                         (Money("60"), Money("40"), Money("2000")))  # a fine paid is not a contribution
+        position = fund_position(self.fines.id)
+        self.assertEqual((position.cash, position.retained, position.member_interests),
+                         (Money("60"), Money("60"), Money("0")))  # the group's money, not the member's share
+        self.assertEqual(member_balances(self.s.fund.id)[m[0].id], Money("1000"))
+        self.assertTrue(reconcile(self.s.ea.id).balanced)
