@@ -25,6 +25,7 @@
 | [0021](0021-operator-login.md) | How WEPL staff sign in: provisioned accounts, password plus authenticator, staged server-side sessions, capabilities that fail closed | **Accepted** (Harry, 2026-10-05), roles support, onboarding, admin; built |
 | [0022](0022-contributions-and-arrears.md) | Contributions and arrears: each fund's rule is the group's own constitution setting (schedule, amount, payment order, fines, leavers' arrears); arrears derived | **Accepted** (Harry, 2026-10-05); built, with fines funds and waivers |
 | [0023](0023-one-account-holds-the-groups-funds.md) | One bank account holds all of a group's funds: fund code in the reference, else the default fund; interest and charges split as the group chooses; reconcile the account against all its funds | **Accepted** (Harry, 2026-10-05); built |
+| [0024](0024-moving-money-between-funds.md) | Moving money between a group's funds: decided like a payout, booked as two mirrored single-fund entries; the owners keep their money; never reversed, moved back instead | **Accepted** (Harry, 2026-10-05); built |
 
 All are **Proposed** until Harry accepts them. Harry's
 [foundational decisions](../architecture/foundational-decisions.md)

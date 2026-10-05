@@ -1,4 +1,5 @@
-"""The states a proposal and a mandate move through. Anything else fails."""
+"""The states a proposal, a mandate and a fund transfer move through.
+Anything else fails."""
 from enum import StrEnum
 
 
@@ -20,11 +21,29 @@ class MandateStatus(StrEnum):
     CANCELLED = "cancelled"
 
 
+class TransferStatus(StrEnum):
+    """A move between funds (ADR-0024): decided like a payout, then booked
+    by custody, or failed if the money is no longer there to move."""
+
+    OPEN = "open"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    CANCELLED = "cancelled"
+    BOOKED = "booked"
+    FAILED = "failed"
+
+
 PROPOSAL_TRANSITIONS = {
     ProposalStatus.OPEN: {ProposalStatus.APPROVED, ProposalStatus.REJECTED, ProposalStatus.CANCELLED},
 }
 MANDATE_TRANSITIONS = {
     MandateStatus.ISSUED: {MandateStatus.EXECUTED, MandateStatus.EXPIRED, MandateStatus.CANCELLED},
+}
+
+
+TRANSFER_TRANSITIONS = {
+    TransferStatus.OPEN: {TransferStatus.APPROVED, TransferStatus.REJECTED, TransferStatus.CANCELLED},
+    TransferStatus.APPROVED: {TransferStatus.BOOKED, TransferStatus.FAILED},
 }
 
 

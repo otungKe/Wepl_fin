@@ -8,8 +8,8 @@ from django.test import TestCase
 
 from contexts.custody.infrastructure.models import LineResolution, StatementLine
 from contexts.custody.public import CustodyError, attribute_payment, explain_outflow
-from contexts.governance.infrastructure.models import Approval, Mandate, Proposal
-from contexts.governance.public import GovernanceError, decide, propose_withdrawal
+from contexts.governance.infrastructure.models import Approval, FundTransfer, Mandate, Proposal
+from contexts.governance.public import GovernanceError, decide, propose_fund_transfer, propose_withdrawal
 from contexts.tenancy.public import cross_tenant
 from simulators.custodian_bank import bank
 from tests.scenario import SIGNATORY, Scenario
@@ -70,6 +70,15 @@ class CrossGroupTests(TestCase):
                                    payee_account="0799000000")
             with self.assertRaisesMessage(GovernanceError, "not a member of this group"):
                 decide(self.a_proposal, self.b.m[0].id, approve=True)
+        self.assert_nothing_written()
+
+    def test_money_never_moves_to_or_from_another_groups_fund(self):
+        with self.widened():
+            for proposer, frm, to in ((self.a.m[4], self.a.fund, self.b.fund), (self.a.m[4], self.b.fund, self.a.fund),
+                                      (self.b.m[0], self.a.fund, self.b.fund)):
+                with self.assertRaisesMessage(GovernanceError, "Both funds must be in the proposer's group"):
+                    propose_fund_transfer(proposer.id, frm.id, to.id, amount="10", source="pro_rata", reason="x")
+            self.assertEqual(FundTransfer.objects.count(), 0)
         self.assert_nothing_written()
 
     def test_a_foreign_mandate_reference_never_authorises_a_payout(self):

@@ -14,6 +14,7 @@ from .inbox import operator_inbox
 
 STEPS = (
     ("sync_accounts", "fetch bank activity and reconcile every account"),
+    ("book_fund_transfers", "book moves between funds the groups approved"),
     ("check_ledger_integrity", "check every fund's books"),
     ("deliver_outbox", "send queued messages"),
 )

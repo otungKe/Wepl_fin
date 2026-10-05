@@ -7,8 +7,9 @@ from contexts.shared_kernel.money import Money
 from .domain.capabilities import Capability
 from .domain.contribution import (ContributionRule, ExtraPayments, FineKind, Frequency, JoinersOweFrom, LateFine,
                                   LeaverArrears, PaymentOrder, WaiverOf)
-from .domain.lifecycle import InvalidTransition, MandateStatus, ProposalStatus
+from .domain.lifecycle import InvalidTransition, MandateStatus, ProposalStatus, TransferStatus
 from .domain.mandate import MANDATE_REFERENCE, Allocation
+from .domain.transfer import TransferFrom, shortfall
 from .domain.rules import (AccountReturns, ConstitutionRules, LeaverBalances, LeaverPayouts, LeaverRuleVersion, RulesError,
                            SharingRule)
 
@@ -16,7 +17,7 @@ __all__ = ["Allocation", "Capability", "ConstitutionRules", "GovernanceError", "
            "MandateStatus", "MandateView", "ProposalStatus", "ProposalView", "RulesError", "SharingRule",
            "AccountReturns", "LeaverBalances", "LeaverPayouts", "LeaverRuleVersion",
            "ContributionRule", "ExtraPayments", "FineKind", "Frequency", "JoinersOweFrom", "LateFine", "LeaverArrears",
-           "PaymentOrder", "WaiverOf", "WaiverView"]
+           "PaymentOrder", "WaiverOf", "WaiverView", "FundTransferView", "TransferFrom", "TransferStatus", "shortfall"]
 
 
 class GovernanceError(ValueError):
@@ -63,3 +64,22 @@ class WaiverView:
     required_approvals: int
     approvals: int
     decided_at: datetime | None
+
+
+@dataclass(frozen=True)
+class FundTransferView:
+    id: int
+    group_id: int
+    from_fund_id: int
+    to_fund_id: int
+    source: TransferFrom
+    member_id: int | None
+    amount: Money
+    reason: str
+    status: TransferStatus
+    required_approvals: int
+    approvals: int
+    decided_at: datetime | None
+    out_entry_id: int | None = None
+    in_entry_id: int | None = None
+    failure: str = ""

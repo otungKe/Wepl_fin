@@ -33,7 +33,13 @@ the lessons carried over, the machinery here is different.
 
 ## The single door
 
-`contexts.ledger.public.post_journal(draft)` is the only way to create journal rows.
+`contexts.ledger.public.post_journal(draft)` is the only way to create journal rows,
+with one exception: a move between two funds of a group (ADR-0024) is a
+`FundTransfer`, a mirrored pair of drafts (`fund_transfer_out`,
+`fund_transfer_in`), posted together by `post_transfer`. `post_journal`
+refuses those kinds on their own, PostgreSQL checks the pair at commit
+(ledger 0009), and neither half is ever reversed: the group moves the money
+back with a new transfer.
 
 1. The owning context's **domain** makes the accounting decision and returns a
    `JournalDraft` (custody's is `custody/domain/accounting.py`). Build drafts

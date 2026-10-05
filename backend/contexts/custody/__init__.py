@@ -7,7 +7,8 @@ against the custodian.
 
 Does not own: the money (the group and custodian do), mandates (governance),
 the journal (ledger), or members (communities). It decides the accounting for
-each bank fact and asks the ledger to post it.
+each bank fact, and for each move between funds the group approved
+(ADR-0024), and asks the ledger to post it.
 
 Invariants: each custodian transaction is processed exactly once; every
 outflow is matched to a mandate or raises an alert to every member; the books
