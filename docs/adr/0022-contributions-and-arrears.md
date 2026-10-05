@@ -69,8 +69,17 @@
    CONFIRMED (Harry, 2026-10-05, "Okay"): paying more than all fines owed
    stays in the fines fund as the group's and is shown as `fines_beyond`;
    returning it is an ordinary approved payout.
-4. **Waivers?** Not built. Proposed: approved like a payout, under the
-   group's own approval rules.
+4. **Waivers?** Built on Claude's proposal (Harry said "Merge and next"
+   when it was offered; not otherwise confirmed): a waiver of part of one
+   member's arrears or fines in a fund is proposed by an active member and
+   decided like a withdrawal: the approval rule for its amount, one vote
+   per member, and the member it is for may not approve it (nor the
+   proposer, unless the constitution allows self-approval). It moves no
+   money (governance 0008: `Waiver`, decided once, never deleted;
+   `WaiverVote` append-only). An approved arrears waiver forgives what was
+   due by its decision date, oldest first, never more and never paid ahead;
+   a fine already incurred stays. A fines waiver lowers fines owed, never
+   below zero.
 
 ## How it works (built)
 

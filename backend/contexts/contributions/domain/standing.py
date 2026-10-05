@@ -24,6 +24,7 @@ class Standing:
     overdue: tuple[tuple[date, Money], ...]   # (due date, still owed), oldest first
     fines: tuple[tuple[date, Money], ...]     # (due date of the late period, fine)
     written_off: Money = Money.zero()   # a leaver's arrears and fines, when the group writes them off
+    waived: Money = Money.zero()        # arrears the group forgave by an approved waiver
 
     @property
     def fines_total(self) -> Money:
@@ -35,11 +36,14 @@ def _min(a: Money, b: Money) -> Money:
 
 
 def standing(periods: list[tuple[date, Money]], payments: list[tuple[date, Money]], *, as_of: date,
-             order: PaymentOrder, extra: ExtraPayments, fine: LateFine, write_off: bool = False) -> Standing:
+             order: PaymentOrder, extra: ExtraPayments, fine: LateFine, write_off: bool = False,
+             waivers: list[tuple[date, Money]] = ()) -> Standing:
     """``periods`` are (due date, amount), oldest first, and may include the
     next one after ``as_of``. A payment counts for every period whose time
     has begun: the period running up to a due date begins the day after the
-    one before it. ``write_off`` is for a leaver whose group writes arrears off."""
+    one before it. ``write_off`` is for a leaver whose group writes arrears off.
+    ``waivers`` are approved waivers of arrears: each forgives what was due by
+    its date, oldest first, and never more; it is never paid ahead."""
     zero = Money.zero()
     remaining = [amount for _, amount in periods]
     cleared: list[list[tuple[date, Money]]] = [[] for _ in periods]
@@ -59,7 +63,16 @@ def standing(periods: list[tuple[date, Money]], payments: list[tuple[date, Money
             if extra is ExtraPayments.PAY_AHEAD:
                 state["credit"] -= clear(i, state["credit"], min(on, periods[i][0]))
 
-    for on, amount in sorted(payments, key=lambda p: p[0]):
+    waived = zero
+    events = sorted([(on, 0, a) for on, a in payments] + [(on, 1, a) for on, a in waivers], key=lambda e: e[:2])
+    for on, is_waiver, amount in events:
+        if is_waiver:
+            open_until(sum(1 for due, _ in periods if due <= on), on)
+            left = amount
+            for i in (i for i in range(state["open"]) if periods[i][0] <= on):
+                taken = clear(i, left, on)
+                left, waived = left - taken, waived + taken
+            continue
         current = next((i for i, (due, _) in enumerate(periods) if due >= on), len(periods) - 1)
         open_until(current + 1, on)
         left = amount
@@ -74,12 +87,12 @@ def standing(periods: list[tuple[date, Money]], payments: list[tuple[date, Money
     arrears = sum((remaining[i] for i in owed), zero)
     ahead = sum((a - remaining[i] for i, (d, a) in enumerate(periods) if d > as_of), zero) + state["credit"]
     fines = tuple(f for i in owed if (f := _fine(fine, periods[i], cleared[i], as_of)) is not None)
-    result = Standing(due=due, paid=due - arrears, arrears=arrears, paid_ahead=ahead,
+    result = Standing(due=due, paid=due - arrears - waived, arrears=arrears, paid_ahead=ahead,
                       overdue=tuple((periods[i][0], remaining[i]) for i in owed if remaining[i].is_positive),
-                      fines=fines)
+                      fines=fines, waived=waived)
     if write_off:
         return Standing(due=due, paid=result.paid, arrears=zero, paid_ahead=ahead, overdue=(), fines=(),
-                        written_off=arrears + result.fines_total)
+                        written_off=arrears + result.fines_total, waived=waived)
     return result
 
 

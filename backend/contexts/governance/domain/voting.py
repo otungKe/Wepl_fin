@@ -27,6 +27,7 @@ class ProposalTerms:
     approvers: ApproverSet
     required: int
     allow_self_approval: bool
+    subject: str = "payout"  # or "waiver": what the charged member would benefit from
 
 
 def ineligibility(voter: Voter, terms: ProposalTerms) -> str | None:
@@ -36,13 +37,14 @@ def ineligibility(voter: Voter, terms: ProposalTerms) -> str | None:
     if not voter.active:
         return "not an active member"
     if terms.approvers is ApproverSet.DESIGNATED and not voter.designated_approver:
-        return "only designated approvers approve withdrawals of this size"
+        return f"only designated approvers approve {'withdrawals' if terms.subject == 'payout' else terms.subject + 's'} of this size"
     if terms.allow_self_approval:
         return None
     if voter.membership_id == terms.proposer_id:
         return "cannot approve a request they made"
     if voter.membership_id == terms.charged_member_id:
-        return "cannot approve a payout charged to themselves"
+        return ("cannot approve a payout charged to themselves" if terms.subject == "payout"
+                else f"cannot approve a {terms.subject} for themselves")
     payee = Msisdn.try_parse(terms.payee_account)
     if payee is not None and payee.value == voter.msisdn:
         return "cannot approve a payment to themselves"

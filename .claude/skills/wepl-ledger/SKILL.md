@@ -135,3 +135,5 @@ different key. Nothing is ever edited.
   (Harry, 2026-10-05). It is paid into the fund the rule names (`pay_into`):
   custody books such a pay-in as `fine_payment` to that fund's `retained`,
   never to the member's share.
+- Waivers (`governance.propose_waiver` / `decide_waiver`) forgive arrears or
+  fines, decided like a withdrawal; they move no money.

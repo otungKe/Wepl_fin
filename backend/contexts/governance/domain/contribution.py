@@ -42,6 +42,12 @@ class LeaverArrears(StrEnum):
     DEDUCTED_FROM_PAYOUT = "deducted_from_payout"
 
 
+class WaiverOf(StrEnum):
+    """What a waiver forgives part of: a member's arrears or their fines in a fund."""
+    ARREARS = "arrears"
+    FINES = "fines"
+
+
 class FineKind(StrEnum):
     NONE = "none"
     FIXED = "fixed"      # ``value`` is an amount per late period

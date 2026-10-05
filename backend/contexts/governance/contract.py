@@ -6,7 +6,7 @@ from contexts.shared_kernel.money import Money
 
 from .domain.capabilities import Capability
 from .domain.contribution import (ContributionRule, ExtraPayments, FineKind, Frequency, JoinersOweFrom, LateFine,
-                                  LeaverArrears, PaymentOrder)
+                                  LeaverArrears, PaymentOrder, WaiverOf)
 from .domain.lifecycle import InvalidTransition, MandateStatus, ProposalStatus
 from .domain.mandate import MANDATE_REFERENCE, Allocation
 from .domain.rules import (AccountReturns, ConstitutionRules, LeaverBalances, LeaverPayouts, LeaverRuleVersion, RulesError,
@@ -16,7 +16,7 @@ __all__ = ["Allocation", "Capability", "ConstitutionRules", "GovernanceError", "
            "MandateStatus", "MandateView", "ProposalStatus", "ProposalView", "RulesError", "SharingRule",
            "AccountReturns", "LeaverBalances", "LeaverPayouts", "LeaverRuleVersion",
            "ContributionRule", "ExtraPayments", "FineKind", "Frequency", "JoinersOweFrom", "LateFine", "LeaverArrears",
-           "PaymentOrder"]
+           "PaymentOrder", "WaiverOf", "WaiverView"]
 
 
 class GovernanceError(ValueError):
@@ -49,3 +49,17 @@ class ProposalView:
     required_approvals: int
     approvals: int
     mandate_reference: str | None
+
+
+@dataclass(frozen=True)
+class WaiverView:
+    id: int
+    group_id: int
+    fund_id: int
+    member_id: int
+    owed: WaiverOf
+    amount: Money
+    status: ProposalStatus
+    required_approvals: int
+    approvals: int
+    decided_at: datetime | None
