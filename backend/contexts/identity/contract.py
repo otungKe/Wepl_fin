@@ -2,8 +2,9 @@
 from dataclasses import dataclass
 
 from .domain.msisdn import InvalidMsisdn, Msisdn
+from .domain.person import IdentityError
 
-__all__ = ["InvalidMsisdn", "Msisdn", "PersonView"]
+__all__ = ["IdentityError", "InvalidMsisdn", "Msisdn", "PersonView"]
 
 
 @dataclass(frozen=True)
