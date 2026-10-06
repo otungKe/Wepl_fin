@@ -32,6 +32,13 @@ def require_tenant() -> int:
     return _tenant.get()
 
 
+def require_cross_tenant() -> None:
+    """For data that belongs to no single tenant and is changed for all of them
+    at once, such as a person (ADR-0009): only inside ``cross_tenant(...)``."""
+    if not _system.get():
+        raise TenancyError("This operation must run inside a declared cross-tenant operation.")
+
+
 def _check(wanted: int | None) -> None:
     if reason := entry_refusal(_tenant.get(), _system.get(), wanted):
         raise TenancyError(f"Tenant boundary: {reason}.")
