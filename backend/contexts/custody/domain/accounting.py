@@ -137,6 +137,29 @@ def payout_explained_elsewhere(held: FundBook, spent: FundBook, *, key: str, lin
     return back, paid
 
 
+def pay_in_moved(held: FundBook, right: FundBook, *, key: str, line_id: int, amount: Money, owner: AccountKey,
+                 member_id: int | None, fine: bool = False, memo_out: str = "",
+                 memo_in: str = "") -> tuple[JournalDraft, JournalDraft]:
+    """A pay-in booked in the wrong fund of the account is booked in the right
+    one instead (ADR-0025). Two entries, one per fund's books: the fund it
+    went to gives it up from whoever it credited (``owner``), and the right
+    fund takes it as if it had arrived there, as ``receipt`` would book it.
+    The account's total cash does not move."""
+    if held.external_account_id != right.external_account_id or held.fund_id == right.fund_id:
+        raise AccountingError("A pay-in moves between two funds held at the same bank account.")
+    if owner.fund_id != held.fund_id:
+        raise AccountingError("The pay-in is taken back from the fund it went to.")
+    out = held.draft(f"{key}:out", "pay_in_moved_out", line_id, [(owner, D, amount), (held.cash(), C, amount)],
+                     memo=memo_out)
+    if member_id and fine:
+        credit = right.retained()
+    else:
+        credit = right.member(member_id) if member_id else right.unattributed()
+    into = right.draft(f"{key}:in", "pay_in_moved_in", line_id, [(right.cash(), D, amount), (credit, C, amount)],
+                       memo=memo_in)
+    return out, into
+
+
 def opening_balances(book: FundBook, *, key: str, line_id: int, statement_balance: Money,
                      signed_off: dict[int, Money]) -> JournalDraft:
     """Bring an existing account in: members get what two correct_records holders signed

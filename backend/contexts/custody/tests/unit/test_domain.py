@@ -115,6 +115,26 @@ class AccountingTests(SimpleTestCase):
                                         signed_off={1: Money("60")})
         self.assertEqual(self.purposes(d)[(AccountPurpose.UNATTRIBUTED_IN, None, Side.CREDIT)], Money("40"))
 
+    def test_a_pay_in_moved_keeps_its_owner_unless_the_right_fund_takes_fines(self):
+        right = FundBook(group_id=BOOK.group_id, fund_id=BOOK.fund_id + 1, external_account_id=BOOK.external_account_id)
+        out, into = accounting.pay_in_moved(BOOK, right, key="k", line_id=1, amount=Money("500"),
+                                            owner=BOOK.member(2), member_id=2)
+        self.assertEqual(self.purposes(out), {(AccountPurpose.MEMBER_INTEREST, 2, Side.DEBIT): Money("500"),
+                                              (AccountPurpose.CUSTODY_CASH, None, Side.CREDIT): Money("500")})
+        self.assertEqual(self.purposes(into), {(AccountPurpose.CUSTODY_CASH, None, Side.DEBIT): Money("500"),
+                                               (AccountPurpose.MEMBER_INTEREST, 2, Side.CREDIT): Money("500")})
+        self.assertEqual((out.fund_id, into.fund_id), (BOOK.fund_id, right.fund_id))
+        _, fine = accounting.pay_in_moved(BOOK, right, key="k", line_id=1, amount=Money("50"), owner=BOOK.member(2),
+                                          member_id=2, fine=True)
+        self.assertIn((AccountPurpose.RETAINED, None, Side.CREDIT), self.purposes(fine))
+        _, held = accounting.pay_in_moved(BOOK, right, key="k", line_id=1, amount=Money("50"),
+                                          owner=BOOK.unattributed(), member_id=None, fine=True)
+        self.assertIn((AccountPurpose.UNATTRIBUTED_IN, None, Side.CREDIT), self.purposes(held))
+        elsewhere = FundBook(group_id=BOOK.group_id, fund_id=right.fund_id, external_account_id=99)
+        for to, owner in ((BOOK, BOOK.member(2)), (elsewhere, BOOK.member(2)), (right, right.member(2))):
+            with self.assertRaises(AccountingError):
+                accounting.pay_in_moved(BOOK, to, key="k", line_id=1, amount=Money("1"), owner=owner, member_id=2)
+
     def test_sharing_needs_members(self):
         with self.assertRaises(AccountingError):
             accounting.share_pro_rata(Money("1"), [], {})
@@ -150,8 +170,11 @@ class ReconciliationAndCorrectionTests(SimpleTestCase):
     def test_only_listed_corrections_are_allowed(self):
         ensure_correction(Outcome.UNATTRIBUTED, Outcome.ATTRIBUTED)
         ensure_correction(Outcome.UNMATCHED, Outcome.EXPLAINED)
+        ensure_correction(Outcome.ATTRIBUTED, Outcome.MOVED)
+        ensure_correction(Outcome.UNATTRIBUTED, Outcome.MOVED)
         for current, new in ((Outcome.ATTRIBUTED, Outcome.ATTRIBUTED), (Outcome.MATCHED, Outcome.EXPLAINED),
-                             (None, Outcome.ATTRIBUTED)):
+                             (None, Outcome.ATTRIBUTED), (Outcome.OPENING, Outcome.MOVED),
+                             (Outcome.INTEREST, Outcome.MOVED), (Outcome.MATCHED, Outcome.MOVED)):
             with self.assertRaises(InvalidCorrection):
                 ensure_correction(current, new)
 

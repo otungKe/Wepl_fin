@@ -74,6 +74,12 @@ reconciles; the alert is the control, not the reconciliation.
   `unattributed → attributed` via `attribute_payment`, and `unmatched →
   explained` via `explain_outflow`. Each is a new journal entry plus a new
   `LineResolution`.
+- **A pay-in in the wrong fund is moved, not transferred** (ADR-0025):
+  `move_pay_in(line, fund, by, reason)` posts two entries (out of the wrong
+  fund, into the right one, same owner) and two resolutions (`moved`, then
+  the line's outcome again). PostgreSQL refuses a `moved` with no booking
+  after it (custody 0009). Arrears count a line by its latest resolution
+  only (`member_pay_ins`).
 - **Opening balances come first.** They must be recorded before any other
   line, with sequence 0. Anything the signers cannot account for goes to
   `unattributed_in`, never to a member.

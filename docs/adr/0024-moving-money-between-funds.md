@@ -114,5 +114,4 @@
   an operation spanning funds is a set of single-fund entries under one cause.
 - A pay-in that went to the wrong fund is **not** fixed by a transfer: arrears
   count pay-ins by the line's fund, so the member would stay in arrears in the
-  right fund. That needs a custody correction that re-routes the line (not
-  built; a separate decision).
+  right fund. That needs a custody correction that re-routes the line: ADR-0025.

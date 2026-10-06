@@ -39,6 +39,14 @@ def entry_funds(entry_ids) -> dict[int, int]:
     return dict(JournalEntry.objects.filter(pk__in=list(entry_ids)).values_list("pk", "fund_id"))
 
 
+def entry_credits(entry_id: int) -> list[tuple[AccountKey, Money]]:
+    """The accounts a journal entry credits, and by how much."""
+    rows = JournalLine.objects.filter(entry_id=entry_id, side=Side.CREDIT.value).select_related("account").order_by("id")
+    return [(AccountKey(group_id=r.account.group_id, fund_id=r.account.fund_id, purpose=r.account.purpose,
+                        member_id=r.account.member_id, external_account_id=r.account.external_account_id,
+                        currency=r.account.currency), Money(r.amount, r.account.currency)) for r in rows]
+
+
 def member_balances(fund_id: int, currency: str = "KES") -> dict[int, Money]:
     rows = (JournalLine.objects.filter(account__fund_id=fund_id, account__purpose=AccountPurpose.MEMBER_INTEREST,
                                        account__currency=currency)
