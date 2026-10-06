@@ -44,6 +44,16 @@ def _locked(fund_id: int) -> Fund:
     return f
 
 
+def hold_open_fund(fund_id: int) -> FundView:
+    """The fund, locked against closing until the caller's transaction ends.
+    For another context about to post money into it: closing takes the same
+    lock and then finds the money, so the two cannot cross. Refuses a closed
+    fund. Call inside a transaction."""
+    f = _locked(fund_id)
+    _domain(ensure_open, f.status)
+    return fund_view(f.pk)
+
+
 @transaction.atomic  # the fund and its audit event commit together, or neither does
 def open_fund(group_id: int, *, name: str, currency: str = "KES", code: str | None = None,
               actor: str) -> FundView:

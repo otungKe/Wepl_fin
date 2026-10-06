@@ -10,7 +10,8 @@ from django.utils import timezone
 from contexts.communities.public import open_fund
 from contexts.contributions.public import fund_standing, member_standing
 from contexts.governance.public import RulesError, adopt_constitution
-from contexts.custody.public import reconcile
+from contexts.custody.infrastructure.models import StatementLine
+from contexts.custody.public import move_pay_in, reconcile
 from contexts.ledger.public import fund_position, member_balances
 from contexts.shared_kernel.money import Money
 from simulators.custodian_bank import bank
@@ -79,4 +80,22 @@ class StandingTests(TestCase):
         self.assertEqual((position.cash, position.retained, position.member_interests),
                          (Money("60"), Money("60"), Money("0")))  # the group's money, not the member's share
         self.assertEqual(member_balances(self.s.fund.id)[m[0].id], Money("1000"))
+        self.assertTrue(reconcile(self.s.ea.id).balanced)
+
+    def test_a_pay_in_moved_to_the_right_fund_counts_there(self):
+        """ADR-0025: a contribution that went to welfare by mistake clears the
+        arrears once moved; a pay-in moved to the fines fund pays fines."""
+        m = self.s.m
+        self.pay(m[2], "1000", 0, reference="WEL")  # meant for savings
+        self.pay(m[2], "100", 0)                    # meant for the fines fund
+        self.s.sync()
+        as_of = self.base + timedelta(days=20)
+        before = member_standing(m[2].id, self.s.fund.id, as_of=as_of)
+        self.assertEqual((before.standing.arrears, before.fines_paid), (Money("2900"), Money("0")))  # the 100 counted as savings
+        move_pay_in(StatementLine.objects.get(amount="1000").pk, self.s.fund.id, by=m[0].id, reason="Savings")
+        move_pay_in(StatementLine.objects.get(amount="100").pk, self.fines.id, by=m[0].id, reason="Fine")
+        after = member_standing(m[2].id, self.s.fund.id, as_of=as_of)
+        self.assertEqual((after.standing.arrears, after.fines_paid), (Money("2000"), Money("100")))
+        self.assertEqual(fund_position(self.fines.id).retained, Money("100"))  # a fine paid is the group's
+        self.assertEqual(member_balances(self.s.fund.id)[m[2].id], Money("1000"))
         self.assertTrue(reconcile(self.s.ea.id).balanced)

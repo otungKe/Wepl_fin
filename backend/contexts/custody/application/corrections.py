@@ -4,11 +4,13 @@ from django.db import transaction
 from django.utils import timezone
 
 from contexts.audit.public import operation, record
-from contexts.communities.public import membership
-from contexts.governance.public import MandateStatus, execute_mandate, mandate
+from contexts.communities.public import CommunityError, fund_view, hold_open_fund, membership
+from contexts.governance.public import MandateStatus, committed_out, execute_mandate, mandate, shortfall
 from contexts.identity.public import Msisdn
+from contexts.ledger.public import account_balance, cash_by_fund, entry_credits
+from contexts.shared_kernel.money import Money
 
-from ..contract import CustodyError
+from ..contract import CustodyError, LineKind
 from ..domain import accounting
 from ..domain.resolution import InvalidCorrection, Outcome, ensure_correction
 from ..domain.sharing import Event
@@ -102,3 +104,61 @@ def _explain(ea, line, m, ids, balances, actor) -> LineResolution:
     bk.post_and_resolve(line, back, Outcome.EXPLAINED, mandate_id=m.id, actor=actor,
                         note=f"Moved to the fund mandate {m.reference} spends")
     return bk.post_and_resolve(line, paid, Outcome.EXPLAINED, mandate_id=m.id, actor=actor, note=note)
+
+
+@transaction.atomic  # the fund lock, both entries, both resolutions and the audit commit together
+def move_pay_in(line_id: int, fund_id: int, *, by: int, reason: str) -> LineResolution:
+    """Book a pay-in in the fund it was meant for, when it went to another fund
+    of the same bank account, e.g. the payer left out the fund code (ADR-0025).
+    The money keeps its owner: the member it was credited to, or nobody yet if
+    it is still unattributed. ``by`` is the corrector's membership id; nobody
+    may move their own pay-in. It moves only while the money is still in the
+    fund it went to and not promised out of it."""
+    ea, line = _locked_line(line_id)
+    last = line.resolutions.order_by("-id").first()
+    member_id = last.membership_id if last else None
+    actor = corrector(by, ea.group_id, beneficiaries=[member_id] if member_id else []).msisdn
+    with operation("custody.move_pay_in", actor=actor):
+        if LineKind(line.kind) is not LineKind.DEPOSIT:
+            raise CustodyError("Only a pay-in can be moved to another fund.")
+        try:
+            ensure_correction(Outcome(last.outcome) if last else None, Outcome.MOVED)
+        except InvalidCorrection as exc:
+            raise CustodyError(f"Only a pay-in credited to a member or held as unattributed can move. {exc}") from None
+        if not reason.strip():
+            raise CustodyError("Say why the pay-in belongs in the other fund.")
+        held_in = bk.line_fund(line)
+        if fund_id == held_in:
+            raise CustodyError("The pay-in is already in that fund.")
+        right = _fund_of(ea, fund_id)
+        wrong = fund_view(held_in)
+        (owner, _), = entry_credits(last.journal_entry_id)  # whoever the pay-in's latest entry credited
+        amount = bk.amount(line)
+        if why := shortfall(amount, owners_hold=account_balance(owner),
+                            cash=cash_by_fund(ea.pk, ea.currency).get(held_in, Money.zero(ea.currency)),
+                            committed=committed_out(held_in)):
+            raise CustodyError(f"The pay-in can no longer move out of {wrong.name}: {why}.")
+        out, into = accounting.pay_in_moved(
+            bk.book(ea, held_in), bk.book(ea, right.id), key=f"line:{line.pk}:move:{line.resolutions.count()}",
+            line_id=line.pk, amount=amount, owner=owner, member_id=member_id, fine=bk.takes_fines(ea, right.id),
+            memo_out=f"Moved to {right.name}", memo_in=f"Moved from {wrong.name}")
+        bk.post_and_resolve(line, out, Outcome.MOVED, membership_id=member_id, actor=actor,
+                            note=f"Moved to {right.name}: {reason.strip()}")
+        resolution = bk.post_and_resolve(line, into, Outcome(last.outcome), membership_id=member_id, actor=actor,
+                                         note=f"Moved from {wrong.name}: {reason.strip()}")
+        record(actor, "custody.pay_in_moved", target_type="statement_line", target_id=line.pk, group_id=ea.group_id,
+               data={"from_fund_id": held_in, "to_fund_id": right.id, "membership_id": member_id,
+                     "reason": reason.strip()[:500]})
+        return resolution
+
+
+def _fund_of(ea: ExternalAccount, fund_id: int):
+    """An open fund of the account's group, locked against closing until this
+    correction commits."""
+    try:
+        f = hold_open_fund(fund_id)
+    except CommunityError as exc:
+        raise CustodyError(f"The pay-in cannot move there: {exc}") from None
+    if f.group_id != ea.group_id or f.currency != ea.currency:
+        raise CustodyError("The pay-in can move only to another fund of this group, in the account's currency.")
+    return f

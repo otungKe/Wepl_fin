@@ -11,11 +11,13 @@ class Outcome(StrEnum):
     UNMATCHED = "unmatched"        # a payout with no mandate: alert raised
     EXPLAINED = "explained"        # an unmatched payout later tied to a mandate
     OPENING = "opening"
+    MOVED = "moved"                # a pay-in taken out of the wrong fund; the next resolution books it in the right one
 
 
 INITIAL = {Outcome.ATTRIBUTED, Outcome.UNATTRIBUTED, Outcome.INTEREST, Outcome.CHARGE, Outcome.MATCHED,
            Outcome.UNMATCHED, Outcome.OPENING}
-CORRECTIONS = {Outcome.UNATTRIBUTED: {Outcome.ATTRIBUTED}, Outcome.UNMATCHED: {Outcome.EXPLAINED}}
+CORRECTIONS = {Outcome.UNATTRIBUTED: {Outcome.ATTRIBUTED, Outcome.MOVED}, Outcome.ATTRIBUTED: {Outcome.MOVED},
+               Outcome.UNMATCHED: {Outcome.EXPLAINED}}
 
 
 class InvalidCorrection(ValueError):

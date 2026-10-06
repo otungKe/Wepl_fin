@@ -1,4 +1,6 @@
 """Read-only projections for members, the group and the bank. Never a source of truth."""
+from django.db.models import OuterRef, Subquery
+
 from contexts.communities.public import fund_view, group_view, members, membership
 from contexts.ledger.public import entry_funds, fund_position, member_balances, member_movements
 from contexts.shared_kernel.money import Money
@@ -65,8 +67,12 @@ def statement_lines(ea_id: int) -> list[dict]:
 def member_pay_ins(fund_id: int, membership_id: int) -> list[tuple]:
     """Pay-ins credited to a member in a fund, as (the bank's date, amount),
     oldest first; a payment credited later by a corrector keeps its bank
-    date. Opening balances are not pay-ins (ADR-0022)."""
-    found = list(LineResolution.objects.filter(outcome=Outcome.ATTRIBUTED, membership_id=membership_id)
+    date. Opening balances are not pay-ins (ADR-0022). Only how each line
+    stands now counts: a pay-in moved to another fund counts there, not in
+    the fund it first went to (ADR-0025)."""
+    latest = LineResolution.objects.filter(line=OuterRef("line")).order_by("-id").values("id")[:1]
+    found = list(LineResolution.objects.filter(outcome=Outcome.ATTRIBUTED, membership_id=membership_id,
+                                               id=Subquery(latest))
                  .select_related("line__external_account").order_by("line__posted_at", "id"))
     funds = entry_funds(r.journal_entry_id for r in found)
     return [(r.line.posted_at, Money(r.line.amount, r.line.external_account.currency))
