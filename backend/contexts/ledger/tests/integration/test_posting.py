@@ -114,6 +114,9 @@ class PostingTests(RealBooks, TestCase):
         with self.assertRaisesMessage(LedgerError, "Unknown journal entry"):
             reverse_journal(999_999, idempotency_key="ghost")
         self.assertEqual(JournalEntry.objects.count(), 0)
+        from contexts.ledger.public import entry_fund
+        with self.assertRaisesMessage(LedgerError, "Unknown journal entry"):
+            entry_fund(999_999)  # was JournalEntry.DoesNotExist, an internal type
 
     def test_load_draft_round_trips_what_was_posted(self):
         from contexts.ledger.application.posting import load_draft
@@ -161,6 +164,22 @@ class PostingTests(RealBooks, TestCase):
         self.assertEqual(rows[-1]["balance"], member_balances(self.fund_id)[self.member_id].amount)
         self.assertEqual(trial_balance(self.fund_id), 0)
         self.assertTrue(fund_position(self.fund_id).invariant_holds)
+
+    def test_a_members_movements_and_the_trial_balance_stay_in_one_currency(self):
+        """The ledger accepts accounts in another currency (review 2026-10-06,
+        M2), so no query may add amounts across currencies."""
+        post_journal(self.draft("kes", "100"))
+        usd = lambda p, **kw: AccountKey(self.group_id, self.fund_id, p, currency="USD", **kw)
+        post_journal(JournalDraft(idempotency_key="usd", group_id=self.group_id, fund_id=self.fund_id, kind="t",
+                                  cause_type="t", cause_id="usd", postings=(
+                                      Posting(usd(AccountPurpose.UNEXPLAINED_OUT), D, Money("7", "USD")),
+                                      Posting(usd(AccountPurpose.MEMBER_INTEREST, member_id=self.member_id), C,
+                                              Money("7", "USD")))))
+        from contexts.ledger.public import member_movements
+        self.assertEqual([r["balance"] for r in member_movements(self.fund_id, self.member_id)], [Money("100").amount])
+        self.assertEqual([r["balance"] for r in member_movements(self.fund_id, self.member_id, "USD")],
+                         [Money("7", "USD").amount])
+        self.assertEqual((trial_balance(self.fund_id), trial_balance(self.fund_id, "USD")), (0, 0))
 
     def test_balances_are_recomputed_from_lines_alone(self):
         """No balance is stored: each query re-derives it, so it always equals

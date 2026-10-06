@@ -39,7 +39,9 @@ with one exception: a move between two funds of a group (ADR-0024) is a
 `fund_transfer_in`), posted together by `post_transfer`. `post_journal`
 refuses those kinds on their own, PostgreSQL checks the pair at commit
 (ledger 0009), and neither half is ever reversed: the group moves the money
-back with a new transfer.
+back with a new transfer. A unique index allows one leg of each kind per
+transfer cause, whatever the keys (ledger 0010): a commit-time check alone
+cannot see a concurrent transaction's legs.
 
 1. The owning context's **domain** makes the accounting decision and returns a
    `JournalDraft` (custody's is `custody/domain/accounting.py`). Build drafts
@@ -96,6 +98,11 @@ imports no other context.
   three times with running counters. Derive from the journal
   (`member_balances`, `fund_position`, `member_movements`).
 
+**Commit-time checks are not concurrency-safe on their own.** A deferred
+trigger that counts rows sees only its own transaction's uncommitted rows,
+so two transactions can each pass it and both commit. Any "at most N per X"
+rule needs a unique index (or a lock); see review-ledger-hardening.md, H2.
+
 ## Reversal
 
 `reverse_journal(entry_id, idempotency_key=...)` posts the mirror image, links
@@ -122,6 +129,15 @@ different key. Nothing is ever edited.
 - A state machine on journals.
 - Mocking `post_journal` in a test; it is the thing under test.
 - A network call inside a transaction that posts.
+
+## Queries and the nightly check
+
+- **Currency:** every balance query takes a currency (default KES) and
+  never adds across currencies, `trial_balance` included.
+- **The nightly check** (`check_books`) reads the journal with its own SQL
+  (`infrastructure/books.py`), checks every entry on its own, and fails a
+  fund whose balance queries disagree with it. Never read its rows as
+  balances.
 
 ## Key tests
 

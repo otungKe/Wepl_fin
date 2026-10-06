@@ -82,6 +82,18 @@ class TransferPostingTests(TestCase):
         with self.assertRaisesMessage(LedgerError, "already used for a different entry"):
             post_transfer(self.transfer("1", shares=(("1", "30"),)))
 
+    def test_a_transfer_already_posted_under_other_keys_is_refused(self):
+        """One leg of each kind per transfer, whatever the keys (ledger 0010):
+        a caller that derives new keys cannot move the money twice."""
+        from dataclasses import replace
+        t = self.transfer()
+        post_transfer(t)
+        again = FundTransfer(replace(t.out, idempotency_key="other:out"), replace(t.into, idempotency_key="other:in"))
+        with self.assertRaisesMessage(LedgerError, "already been posted under another key"):
+            post_transfer(again)
+        self.assertEqual(JournalEntry.objects.filter(cause_type="governance.fund_transfer", cause_id="1").count(), 2)
+        self.assertEqual(member_balances(self.general.id), {self.m[1]: Money("80"), self.m[2]: Money("40")})
+
     def test_half_a_transfer_is_refused_by_the_ledger(self):
         with self.assertRaisesMessage(LedgerError, "posted together"):
             post_journal(self.transfer().out)
@@ -112,7 +124,7 @@ class TransferPostingTests(TestCase):
 
     def test_the_nightly_check_fails_a_fund_with_an_unpaired_half(self):
         post_transfer(self.transfer())
-        with mock.patch("contexts.ledger.application.integrity._unpaired_transfers", return_value=1):
+        with mock.patch("contexts.ledger.infrastructure.books.unpaired_transfers", return_value=1):
             checks = check_books()
         self.assertTrue(checks and not any(c.passed for c in checks))
 

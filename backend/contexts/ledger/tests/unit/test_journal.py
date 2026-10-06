@@ -80,3 +80,28 @@ class JournalDraftTests(SimpleTestCase):
         c = draft(Posting(CASH, D, Money("11")), Posting(MEMBER, C, Money("11")))
         self.assertEqual(a.fingerprint(), b.fingerprint())
         self.assertNotEqual(a.fingerprint(), c.fingerprint())
+
+    def test_every_entry_names_its_kind_and_cause(self):
+        """Traceability: an entry always says what it is and what caused it.
+        A missing cause id is refused, not stored as the text "None"."""
+        p = (Posting(CASH, D, Money("10")), Posting(MEMBER, C, Money("10")))
+        for field, value in (("kind", ""), ("cause_type", ""), ("cause_id", ""), ("cause_id", None)):
+            fields = {**dict(idempotency_key="k", group_id=1, fund_id=1, kind="t", cause_type="t", cause_id="1",
+                             postings=p), field: value}
+            with self.subTest(field=field, value=value), self.assertRaisesMessage(LedgerError, "kind and a cause"):
+                JournalDraft(**fields)
+        self.assertEqual(draft(*p).cause_id, "1")
+
+    def test_the_fingerprint_is_pinned(self):
+        """Stored fingerprints must keep matching honest replays. The text
+        includes AccountKey's repr, and so the enum's: if a Python upgrade or
+        a change to AccountKey alters it, every replay of an older entry would
+        be refused as key reuse. If this fails, stored fingerprints need a
+        migration first (see JournalDraft.fingerprint)."""
+        d = draft(Posting(CASH, D, Money("10")), Posting(MEMBER, C, Money("10")))
+        self.assertEqual(d.fingerprint(), "\n".join([
+            "t", "t", "1",
+            "AccountKey(group_id=1, fund_id=1, purpose=<AccountPurpose.CUSTODY_CASH: 'custody_cash'>, member_id=None, "
+            "external_account_id=9, currency='KES')|D|10.00|KES",
+            "AccountKey(group_id=1, fund_id=1, purpose=<AccountPurpose.MEMBER_INTEREST: 'member_interest'>, "
+            "member_id=5, external_account_id=None, currency='KES')|C|10.00|KES"]))

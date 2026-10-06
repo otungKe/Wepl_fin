@@ -1,11 +1,13 @@
 """Ledger persistence. Append-only and balance-checked by PostgreSQL (0002)."""
 from django.db import models
-from django.db.models import Q
+from django.db.models import CharField, F, Q
+from django.db.models.functions import Cast
 
 from contexts.tenancy.contract import TenantScope
 from persistence.tenancy import tenant_column
 
 from ..domain.accounts import AccountPurpose, Side
+from ..domain.transfer import TRANSFER_KINDS
 
 SIDES = [(s.value, s.name.title()) for s in Side]
 DEBIT_NORMAL = [p.value for p in AccountPurpose if p.normal_side is Side.DEBIT]
@@ -70,7 +72,22 @@ class JournalEntry(models.Model):
         indexes = [models.Index(fields=["fund_id", "id"]), models.Index(fields=["cause_type", "cause_id"]),
                    # The idempotency lookup, for the reason given on Account.
                    models.Index(fields=["idempotency_key"], name="ledger_entry_key")]
-        constraints = [models.UniqueConstraint(fields=["tenant", "idempotency_key"], name="ledger_entry_key_unique")]
+        constraints = [
+            models.UniqueConstraint(fields=["tenant", "idempotency_key"], name="ledger_entry_key_unique"),
+            # One leg of each kind per transfer, whatever its key (ADR-0024). 0009's
+            # commit-time pair check cannot see a concurrent transaction's legs.
+            models.UniqueConstraint(fields=["tenant", "cause_type", "cause_id", "kind"],
+                                    condition=Q(kind__in=sorted(TRANSFER_KINDS)), name="ledger_transfer_leg_once"),
+            # Every entry says what it is and what caused it (traceability).
+            models.CheckConstraint(condition=~Q(kind="") & ~Q(cause_type="") & ~Q(cause_id=""),
+                                   name="ledger_entry_has_kind_and_cause"),
+            # As in the domain: a reversal's cause is the entry it reverses, so the
+            # reversed entry is part of its fingerprint; a transfer leg reverses nothing.
+            models.CheckConstraint(condition=Q(reverses__isnull=True)
+                                   | (Q(cause_type="journal_entry", cause_id=Cast(F("reverses"), CharField()))
+                                      & ~Q(kind__in=sorted(TRANSFER_KINDS))),
+                                   name="ledger_reversal_names_its_original"),
+        ]
 
 
 class JournalLine(models.Model):
@@ -109,12 +126,21 @@ class IntegrityCheck(models.Model):
     # Fund-transfer entries of this fund whose other half is missing (ADR-0024).
     # PostgreSQL refuses such a commit (ledger 0009); this watches for a bypass.
     unpaired_transfers = models.PositiveIntegerField(default=0)
+    # Entries of this fund with fewer than two lines, a line outside the fund,
+    # or lines that do not balance in some currency. PostgreSQL refuses each
+    # (0002, 0005); a trial balance can miss two that offset each other.
+    broken_entries = models.PositiveIntegerField(default=0)
+    # Whether the product's own balance queries (fund_position, trial_balance)
+    # agree with the check's independent sums: a query bug is a failure too.
+    queries_agree = models.BooleanField(default=True)
     checked_at = models.DateTimeField(auto_now_add=True)
     operation_id = models.CharField(max_length=64, blank=True, default="")
 
     class Meta:
         indexes = [models.Index(fields=["fund_id", "id"])]
         constraints = [models.CheckConstraint(  # "passed" can only mean every check held
-            condition=Q(passed=True, trial_balance=0, invariant_holds=True, unpaired_transfers=0)
-            | (Q(passed=False) & ~Q(trial_balance=0, invariant_holds=True, unpaired_transfers=0)),
-            name="ledger_check_passed_means_all")]
+            condition=Q(passed=True, trial_balance=0, invariant_holds=True, unpaired_transfers=0, broken_entries=0,
+                        queries_agree=True)
+            | (Q(passed=False) & ~Q(trial_balance=0, invariant_holds=True, unpaired_transfers=0, broken_entries=0,
+                                    queries_agree=True)),
+            name="ledger_check_passed_means_every_check")]
