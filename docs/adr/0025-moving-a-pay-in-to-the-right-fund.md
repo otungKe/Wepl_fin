@@ -2,8 +2,10 @@
 
 - **Status:** **Proposed** (Claude, 2026-10-06), built behind it. Harry
   asked to continue the agreed plan ("Continue", 2026-10-06); this is the gap
-  ADR-0023 and ADR-0024 left open. The choices marked PROPOSED below are
-  Claude's and wait for Harry.
+  ADR-0023 and ADR-0024 left open.
+  - CONFIRMED (Harry, on a card, 2026-10-06): "One corrector". One member
+    granted `correct_records` may move a pay-in; two are not needed.
+  - The rest is Claude's design, as built.
 - **Touches:** ADR-0022 (arrears count pay-ins), ADR-0023 (one account holds
   the group's funds), ADR-0024 (moving money between funds), ADR-0015
   (closing funds), ADR-0011 (capabilities).
@@ -43,7 +45,7 @@
    latest resolution, so a moved pay-in counts in the right fund and no
    longer in the wrong one. Moved into the fines fund it pays fines; moved
    out of it, it is a contribution again.
-5. **Who.** PROPOSED: one member granted `correct_records`, and never the
+5. **Who.** CONFIRMED (Harry, 2026-10-06): one member granted `correct_records`, and never the
    member whose pay-in it is (as `attribute_payment`). A reason is
    required and audited (`custody.pay_in_moved`, with both funds).
 6. **When it may move.** Only a pay-in whose latest resolution is
@@ -70,9 +72,10 @@
   for a wrong entry, but the pay-in's original entry stays true for the day
   it was booked; the move is a later decision, so it is a new entry.
   Rejected.
-- **Two correctors, as for opening balances.** PROPOSED against: the money
+- **Two correctors, as for opening balances.** Rejected (Harry chose one
+  corrector, 2026-10-06): the money
   keeps its owner, the trail shows who moved it and why, and a member who
-  disagrees can ask for it back. Harry may prefer two.
+  disagrees can ask for it back.
 
 ## Consequences
 
