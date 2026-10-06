@@ -146,10 +146,33 @@ def move_pay_in(line_id: int, fund_id: int, *, by: int, reason: str) -> LineReso
                             note=f"Moved to {right.name}: {reason.strip()}")
         resolution = bk.post_and_resolve(line, into, Outcome(last.outcome), membership_id=member_id, actor=actor,
                                          note=f"Moved from {wrong.name}: {reason.strip()}")
+        _settle_unclear_code(line, f"Moved to {right.name} ({actor})")
         record(actor, "custody.pay_in_moved", target_type="statement_line", target_id=line.pk, group_id=ea.group_id,
                data={"from_fund_id": held_in, "to_fund_id": right.id, "membership_id": member_id,
                      "reason": reason.strip()[:500]})
         return resolution
+
+
+@transaction.atomic
+def keep_pay_in(line_id: int, *, by: int, reason: str) -> None:
+    """Confirm that a pay-in whose reference named no one fund belongs in the
+    fund it went to, and close its alert (ADR-0026). Nothing is posted. ``by``
+    is the corrector's membership id. To put it in another fund, use
+    ``move_pay_in`` instead, which closes the alert too."""
+    ea, line = _locked_line(line_id)
+    actor = corrector(by, ea.group_id).msisdn
+    if not reason.strip():
+        raise CustodyError("Say why the pay-in stays where it is.")
+    with operation("custody.keep_pay_in", actor=actor):
+        if not _settle_unclear_code(line, f"Kept in {fund_view(bk.line_fund(line)).name} ({actor}): {reason.strip()}"):
+            raise CustodyError("This pay-in has no open question about its fund.")
+        record(actor, "custody.pay_in_kept", target_type="statement_line", target_id=line.pk, group_id=ea.group_id,
+               data={"fund_id": bk.line_fund(line), "reason": reason.strip()[:500]})
+
+
+def _settle_unclear_code(line: StatementLine, note: str) -> int:
+    return Alert.objects.filter(kind=Alert.Kind.FUND_CODE_UNCLEAR, line=line, resolved_at__isnull=True).update(
+        resolved_at=timezone.now(), resolution_note=note[:255])
 
 
 def _fund_of(ea: ExternalAccount, fund_id: int):

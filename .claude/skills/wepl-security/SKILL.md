@@ -70,8 +70,11 @@ yet.
   A string cannot be checked against anything. That was the gap ADR-0008
   closed.
 - **Setup commands still take a free-text `actor`:** `create_group`,
-  `add_member`, `adopt_constitution` and `link_external_account`. They are
-  operator actions, reachable only from code and tests. When each gets an
+  `add_member`, `leave_group`, `set_title`, `open_fund`, `rename_fund`,
+  `set_fund_code`, `close_fund`, `adopt_constitution` and
+  `link_external_account`. They are operator actions (`groups.setup`, or
+  `custody.link` for the account; ADR-0021, ADR-0026), reachable only from
+  code and tests. When each gets an
   endpoint, it takes the operator from `operators.public.authenticate(token,
   capability)` and audits `operator:<id>`; never a string from the request.
 - **Refusals raise the context's own error** (`CustodyError`,

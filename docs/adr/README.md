@@ -27,6 +27,7 @@
 | [0023](0023-one-account-holds-the-groups-funds.md) | One bank account holds all of a group's funds: fund code in the reference, else the default fund; interest and charges split as the group chooses; reconcile the account against all its funds | **Accepted** (Harry, 2026-10-05); built |
 | [0024](0024-moving-money-between-funds.md) | Moving money between a group's funds: decided like a payout, booked as two mirrored single-fund entries; the owners keep their money; never reversed, moved back instead | **Accepted** (Harry, 2026-10-05); built |
 | [0025](0025-moving-a-pay-in-to-the-right-fund.md) | A pay-in booked in the wrong fund is moved to the right one by a corrector: two entries, the owner keeps it, arrears follow the line | Proposed (Claude, 2026-10-06); one corrector confirmed by Harry (2026-10-06); built |
+| [0026](0026-fund-codes-and-closed-funds.md) | A fund code is its fund's for good (3–6 letters); an unclear code raises an alert; a closed fund takes no money (PostgreSQL); the default fund is custody's; operators set up groups, members and funds | **Accepted** (Harry, 2026-10-06) |
 
 All are **Proposed** until Harry accepts them. Harry's
 [foundational decisions](../architecture/foundational-decisions.md)

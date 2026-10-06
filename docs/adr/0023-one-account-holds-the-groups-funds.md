@@ -29,8 +29,9 @@
    `ExternalAccount.fund` is the **default fund**. A ledger cash account
    may name any account of its own group (custody 0008; it used to have to
    be the same fund's).
-2. **Fund codes.** A fund may have a code of 2 to 6 letters (`WEL`), unique
-   among the group's open funds, case ignored (communities 0015;
+2. **Fund codes.** A fund may have a code of 3 to 6 letters (`WEL`; 2 to 6
+   until ADR-0026), its fund's for good: never given to another fund of the
+   group, even after a change or a closing (ADR-0026). Case ignored (communities 0015, 0017;
    `open_fund(code=…)`, `set_fund_code`, audited). Letters only, so a code is
    never read as a mobile number or a member code (`M01`).
 3. **A pay-in goes to the fund its reference names, else to the default
@@ -39,7 +40,8 @@
    `0712597024 WEL`, `WEL 0712597024` and `M05 WEL` all work.
    - Letters that are no open fund's code are ignored and the
      money goes to the default fund (it still belongs to the member and is
-     visible). Where the collections service is on, the bank's reference
+     visible). Since ADR-0026 this, and a reference quoting two funds'
+     codes, also raises a `fund_code_unclear` alert for a corrector. Where the collections service is on, the bank's reference
      check refuses such a reference instead (`/collections/validate`), so
      the payer can correct it before paying.
 4. **A payout spends the fund its mandate names.** Mandates are matched

@@ -8,9 +8,10 @@ from django.test import TestCase
 from contexts.audit.infrastructure.models import AuditEvent
 from contexts.communities.public import CommunityError, close_fund, open_fund, set_fund_code
 from contexts.custody.infrastructure.models import Alert, LineResolution, StatementLine
-from contexts.custody.public import attribute_payment, explain_outflow, group_summary, reconcile
+from contexts.custody.public import (CustodyError, attribute_payment, explain_outflow, group_summary, keep_pay_in,
+                                     move_pay_in, reconcile)
 from contexts.governance.infrastructure.models import Mandate
-from contexts.ledger.public import fund_position, member_balances, trial_balance
+from contexts.ledger.public import entry_fund, fund_position, member_balances, trial_balance
 from contexts.shared_kernel.money import Money
 from simulators.custodian_bank import bank
 from tests.scenario import RULES, Scenario
@@ -109,6 +110,63 @@ class SharedAccountTests(TestCase):
         self.assert_balanced()
 
 
+class UnclearCodeTests(TestCase):
+    """A reference that names no one fund goes to the default fund, and a
+    corrector is asked to settle it (Harry, 2026-10-06; ADR-0026)."""
+
+    def setUp(self):
+        self.s = Scenario()
+        self.enterContext(self.s.acting())
+        self.main = self.s.fund
+        self.welfare = open_fund(self.s.group.id, name="Welfare", code="WEL", actor="test")
+        self.edu = open_fund(self.s.group.id, name="Education", code="EDU", actor="test")
+
+    def pay(self, reference):
+        bank.deposit(N, "400", msisdn="254712000004", name="KIPRONO C", reference=reference)
+        self.s.sync()
+        return StatementLine.objects.order_by("-id").first()
+
+    def alert(self, line):
+        return Alert.objects.filter(kind=Alert.Kind.FUND_CODE_UNCLEAR, line=line).first()
+
+    def test_an_unknown_or_ambiguous_code_goes_to_the_default_fund_with_an_alert(self):
+        for reference, why in (("0712000004 WLF", "WLF is not the code"), ("WEL EDU", "two funds (WEL and EDU)")):
+            with self.subTest(reference):
+                line = self.pay(reference)
+                self.assertEqual(entry_fund(LineResolution.objects.get(line=line).journal_entry_id), self.main.id)
+                self.assertIn(why, self.alert(line).message)
+                self.assertIn("Main savings", self.alert(line).message)
+        self.assertEqual(fund_position(self.welfare.id).cash, Money("0"))
+
+    def test_one_fund_named_is_clear_and_the_code_is_kept_on_the_line(self):
+        for reference in ("0712000004 WEL", "WEL WEL", "0712000004", "M04"):
+            with self.subTest(reference):
+                line = self.pay(reference)
+                self.assertIsNone(self.alert(line))
+        notes = list(LineResolution.objects.order_by("id").values_list("note", flat=True))
+        self.assertEqual(notes[:2], ["Fund code WEL", "Fund code WEL"])
+
+    def test_a_corrector_moves_it_or_keeps_it_and_either_settles_the_alert(self):
+        moved, kept = self.pay("0712000004 WLF"), self.pay("M04 WELFARE")
+        move_pay_in(moved.pk, self.welfare.id, by=self.s.m[0].id, reason="WLF was a typo for WEL")
+        self.assertIsNotNone(self.alert(moved).resolved_at)
+        with self.assertRaisesMessage(CustodyError, "Say why"):
+            keep_pay_in(kept.pk, by=self.s.m[0].id, reason=" ")
+        keep_pay_in(kept.pk, by=self.s.m[0].id, reason="Main savings, as the member confirmed")
+        self.assertIn("Kept in Main savings", self.alert(kept).resolution_note)
+        self.assertTrue(AuditEvent.objects.filter(action="custody.pay_in_kept").exists())
+        with self.assertRaisesMessage(CustodyError, "no open question"):
+            keep_pay_in(kept.pk, by=self.s.m[0].id, reason="again")
+        self.assertEqual((fund_position(self.main.id).cash, fund_position(self.welfare.id).cash),
+                         (Money("400"), Money("400")))
+
+    def test_only_a_corrector_keeps_a_pay_in(self):
+        line = self.pay("WLF")
+        with self.assertRaisesMessage(CustodyError, "Not authorised"):
+            keep_pay_in(line.pk, by=self.s.m[3].id, reason="mine")
+        self.assertIsNone(self.alert(line).resolved_at)
+
+
 class DefaultFundReturnsTests(SharedAccountTests):
     """The other choice: everything on the account goes to the default fund."""
 
@@ -130,16 +188,24 @@ class FundCodeTests(TestCase):
         self.s = Scenario()
         self.enterContext(self.s.acting())
 
-    def test_a_code_is_letters_and_means_one_open_fund(self):
-        for bad in ("W", "W1", "WELFARE", "WE L", ""):
-            with self.subTest(bad), self.assertRaisesMessage(CommunityError, "two to six letters"):
+    def test_a_code_is_letters_and_means_one_fund_for_good(self):
+        """Three to six letters; once a fund has used a code, no other fund of
+        the group ever gets it, so a payer quoting it is never misdirected
+        (Harry, 2026-10-06; ADR-0026)."""
+        for bad in ("W", "WE", "W1", "WELFARE", "WE L", ""):
+            with self.subTest(bad), self.assertRaisesMessage(CommunityError, "three to six letters"):
                 open_fund(self.s.group.id, name=f"Fund {bad}", code=bad, actor="test")
         old = open_fund(self.s.group.id, name="Old welfare", code="wel", actor="test")
         with self.assertRaisesMessage(CommunityError, "already has the code WEL"):
             open_fund(self.s.group.id, name="Welfare", code="WEL", actor="test")
-        close_fund(old.id, actor="test")  # a closed fund's code is free again
-        welfare = open_fund(self.s.group.id, name="Welfare", code="WEL", actor="test")
-        self.assertEqual(set_fund_code(welfare.id, "wf", actor="t").code, "WF")
-        self.assertTrue(AuditEvent.objects.filter(action="fund.code_set", data__to="WF").exists())
-        with self.assertRaisesMessage(CommunityError, "already has the code WF"):
-            set_fund_code(self.s.fund.id, "WF", actor="t")
+        close_fund(old.id, actor="test")
+        with self.assertRaisesMessage(CommunityError, "never given to a different fund"):
+            open_fund(self.s.group.id, name="Welfare", code="WEL", actor="test")  # closed, still its code
+        welfare = open_fund(self.s.group.id, name="Welfare", code="WLF", actor="test")
+        self.assertEqual(set_fund_code(welfare.id, "wfd", actor="t").code, "WFD")
+        self.assertTrue(AuditEvent.objects.filter(action="fund.code_set", data__to="WFD").exists())
+        with self.assertRaisesMessage(CommunityError, "already has the code WFD"):
+            set_fund_code(self.s.fund.id, "WFD", actor="t")
+        with self.assertRaisesMessage(CommunityError, "never given to a different fund"):
+            set_fund_code(self.s.fund.id, "WLF", actor="t")  # Welfare's earlier code stays Welfare's
+        self.assertEqual(set_fund_code(welfare.id, "WLF", actor="t").code, "WLF")  # its own again

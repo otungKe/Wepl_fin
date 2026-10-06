@@ -123,6 +123,24 @@ class MembershipTests(TestCase):
         self.refused_by_the_database(lambda: Membership.objects.filter(pk=other.id).update(left_at=left_at))
         self.refused_by_the_database(lambda: Membership.objects.filter(pk=other.id).update(status="left"))
 
+    def test_the_database_knows_only_active_and_left(self):
+        """No third status to step around "left is final" through (review of 2026-10-06, C3)."""
+        m = self.add(1, title="Treasurer")
+        row = Membership.objects.filter(pk=m.id)
+        self.refused_by_the_database(lambda: row.update(status="suspended"))
+        from datetime import timedelta
+        self.refused_by_the_database(lambda: row.update(status="left", left_at=row.get().joined_at - timedelta(1)))
+        leave_group(m.id, actor="t")
+        self.refused_by_the_database(lambda: row.update(title="Chair"))  # an ended spell's title is history
+        self.assertEqual(row.get().title, "Treasurer")
+
+    def test_an_invalid_number_or_name_is_a_community_error_and_writes_nothing(self):
+        people = Person.objects.count()
+        for msisdn, name in (("12345", "P"), ("0712000001", " ")):
+            with self.subTest(msisdn), self.assertRaises(CommunityError):
+                add_member(self.group.id, msisdn=msisdn, name=name, actor="t")
+        self.assertEqual((Person.objects.count(), members(self.group.id)), (people, []))
+
     def test_a_member_who_left_holds_no_capability(self):
         m = self.add(1)
         grant(m.id, Capability.CORRECT_RECORDS, actor="t")
@@ -246,6 +264,19 @@ class TenantBoundaryTests(TestCase):
                          lambda: leave_group(self.b_member.id, actor="t")):
             with self.subTest(use_case), self.assertRaisesMessage(TenancyError, "needs a tenant context"):
                 use_case()
+
+    def test_reading_needs_a_tenant_or_a_declared_cross_tenant_operation(self):
+        """Never an empty answer that looks like "no members" (review of 2026-10-06, I7)."""
+        for query in (lambda: members(self.a.id), lambda: open_fund(self.a.id, name="X", actor="t")):
+            with self.subTest(query), self.assertRaises(TenancyError):
+                query()
+        with cross_tenant("test", actor="t"):
+            self.assertEqual([m.id for m in members(self.b.id)], [self.b_member.id])
+
+    def test_a_group_never_moves_to_another_tenant(self):
+        with cross_tenant("test", actor="t"), self.assertRaisesMessage(DatabaseError, "never moves"), \
+                transaction.atomic():
+            Group.objects.filter(pk=self.a.id).update(tenant_id=self.b.tenant_id)
 
 
 class FoundingTests(TestCase):

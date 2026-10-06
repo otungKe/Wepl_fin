@@ -13,6 +13,7 @@ from .queries import fund_view, group_view
 
 UNIQUE_NAME = "community_open_fund_name_any_case"
 UNIQUE_CODE = "community_open_fund_code"
+RESERVED_CODE = "community_fund_code_reserved"  # another fund of the group held it once (0017, ADR-0026)
 
 
 def _domain(fn, *args):
@@ -32,6 +33,9 @@ def _save_name(save, group_name: str, name: str, code: str | None = None):
         constraint = getattr(getattr(exc.__cause__, "diag", None), "constraint_name", None)
         if constraint == UNIQUE_CODE:
             raise CommunityError(f"Another open fund of {group_name} already has the code {code}.") from None
+        if constraint == RESERVED_CODE:
+            raise CommunityError(f"{code} was another fund of {group_name}'s code; a fund code is never given "
+                                 f"to a different fund, so payers quoting it are never misdirected.") from None
         if constraint != UNIQUE_NAME:
             raise
         raise CommunityError(f"{group_name} already has a fund called {name!r}.") from None
@@ -93,8 +97,11 @@ def rename_fund(fund_id: int, name: str, *, actor: str) -> FundView:
 @transaction.atomic
 def set_fund_code(fund_id: int, code: str, *, actor: str) -> FundView:
     """Give an open fund the code members add to a pay-in reference to pay
-    into it (ADR-0023), or change it. Members must be told: a pay-in quoting
-    the old code goes to the group's default fund."""
+    into it (ADR-0023), or change it. A code stays its fund's for good
+    (ADR-0026): the old one is never given to another fund, so a pay-in still
+    quoting it is never misdirected. Custody routes such a pay-in as it does
+    any reference naming no open fund's code. Members must be told the new
+    code."""
     require_tenant()
     f = _locked(fund_id)
     _domain(ensure_open, f.status)

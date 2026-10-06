@@ -3,7 +3,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from contexts.audit.public import record
-from contexts.identity.public import register_person
+from contexts.identity.public import IdentityError, InvalidMsisdn, register_person
 from contexts.tenancy.public import require_tenant
 
 from ..contract import CommunityError, MembershipView
@@ -30,7 +30,10 @@ def add_member(group_id: int, *, msisdn: str, name: str, title: str = "", actor:
         title = clean_title(title)
     except MembershipError as exc:
         raise CommunityError(str(exc)) from None
-    person = register_person(msisdn, name)
+    try:
+        person = register_person(msisdn, name)
+    except (IdentityError, InvalidMsisdn) as exc:
+        raise CommunityError(str(exc)) from None
     group = Group.objects.select_for_update().filter(pk=group_id).first()
     if group is None:  # unknown, or another tenant's and so invisible: the two read the same
         raise CommunityError(f"Unknown group {group_id}.")

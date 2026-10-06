@@ -2,7 +2,7 @@
 from django.db import transaction
 
 from contexts.audit.public import operation, record
-from contexts.communities.public import funds, group_view, members
+from contexts.communities.public import CommunityError, fund_view, funds, group_view, hold_open_fund, members
 from contexts.governance.public import execute_mandate, find_by_reference, issued_for_amount, mandate
 from contexts.ledger.public import cash_by_fund
 from contexts.notifications.public import notify
@@ -12,7 +12,7 @@ from ..domain import accounting
 from ..domain.attribution import MemberFacts, attribute
 from ..domain.matching import match_outflow, quoted_references
 from ..domain.resolution import Outcome
-from ..domain.routing import fund_for, split_across_funds
+from ..domain.routing import fund_for, quoted_codes, split_across_funds, unclear_code
 from ..domain.sharing import Event
 from ..domain.statement import BankLine, LineKind
 from ..infrastructure.models import Alert, ExternalAccount, PayerMapping, StatementLine
@@ -78,8 +78,24 @@ def fund_codes(group_id: int) -> dict[str, int]:
     return {f.code: f.id for f in funds(group_id) if f.code}
 
 
+def _route(ea, line) -> tuple[int, str, dict[str, int]]:
+    """The fund the pay-in is for (ADR-0023), locked against closing until
+    this line commits (ADR-0026): a fund that closed since its code was read
+    is routed again, as if its code were unknown. The default fund cannot
+    close while the account is open."""
+    codes = fund_codes(ea.group_id)
+    fund_id, reference = fund_for(line.reference, codes, ea.fund_id)
+    if fund_id != ea.fund_id:
+        try:
+            hold_open_fund(fund_id)
+        except CommunityError:
+            codes = fund_codes(ea.group_id)
+            fund_id, reference = fund_for(line.reference, codes, ea.fund_id)
+    return fund_id, reference, codes
+
+
 def _deposit(ea, line):
-    fund_id, reference = fund_for(line.reference, fund_codes(ea.group_id), ea.fund_id)  # ADR-0023
+    fund_id, reference, codes = _route(ea, line)
     group_members = members(ea.group_id, active_only=False)  # ended spells too: their codes stay theirs
     remembered = dict(PayerMapping.objects.filter(group_id=ea.group_id).values_list("msisdn", "membership_id"))
     member_id = attribute(reference=reference, narration=line.narration, payer_msisdn=line.counterparty_msisdn,
@@ -87,18 +103,34 @@ def _deposit(ea, line):
                           remembered_payers=remembered)
     draft = accounting.receipt(bk.book(ea, fund_id), key=f"line:{line.pk}:receipt", line_id=line.pk, amount=bk.amount(line),
                                member_id=member_id, fine=bk.takes_fines(ea, fund_id))
+    quoted, why = quoted_codes(line.reference, codes), unclear_code(line.reference, codes)
+    via = f"Fund code {quoted[0]}" if quoted and not why else ""  # which code routed it, kept on the line
     if member_id:
-        bk.post_and_resolve(line, draft, Outcome.ATTRIBUTED, membership_id=member_id)
+        bk.post_and_resolve(line, draft, Outcome.ATTRIBUTED, membership_id=member_id, note=via)
         member = next(m for m in group_members if m.id == member_id)
         notify("contribution.received", {"msisdn": member.msisdn, "group_id": ea.group_id,
                                          "amount": str(line.amount), "external_id": line.external_id},
                dedupe_key=f"contribution.received:{line.pk}")
     else:
-        bk.post_and_resolve(line, draft, Outcome.UNATTRIBUTED, note="Payer not recognised")
+        bk.post_and_resolve(line, draft, Outcome.UNATTRIBUTED, note="; ".join(filter(None, ["Payer not recognised", via])))
         # For whoever the group granted correct_records, not a title (ADR-0011).
         notify("payer.unidentified", {"group_id": ea.group_id, "line_id": line.pk, "amount": str(line.amount),
                                       "payer": line.counterparty_name, "msisdn": line.counterparty_msisdn},
                dedupe_key=f"payer.unidentified:{line.pk}")
+    if why:
+        _unclear_code(ea, line, why)
+
+
+def _unclear_code(ea, line, why: str) -> None:
+    """The pay-in went to the default fund because its reference named no one
+    fund (ADR-0026). A corrector moves it (``move_pay_in``) or confirms it
+    stays (``keep_pay_in``); either closes the alert."""
+    alert = Alert.objects.create(
+        group_id=ea.group_id, kind=Alert.Kind.FUND_CODE_UNCLEAR, line=line,
+        message=(f"{line.amount} received on {line.posted_at:%d %b %Y} went to {fund_view(ea.fund_id).name}: "
+                 f"{why}.")[:255])
+    record("system", "custody.fund_code_unclear", target_type="statement_line", target_id=line.pk,
+           group_id=ea.group_id, data={"reference": line.reference, "reason": why, "alert_id": alert.pk})
 
 
 def _interest(ea, line):
