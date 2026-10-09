@@ -107,6 +107,22 @@ class ConcurrentFundTests(unittest.TestCase):
             self.assertEqual(Fund.objects.filter(group_id=group.id).count(), JOINERS)
 
 
+class ConcurrentAdoptionTests(unittest.TestCase):
+    """Constitution versions are numbered under a per-group lock. The rows are
+    append-only, so the application's role cannot lock them FOR UPDATE
+    (ADR-0027); an advisory lock serialises adoptions instead."""
+    databases = {"default"}  # so the runner builds the test database even when run alone
+
+    def test_simultaneous_adoptions_get_consecutive_versions(self):
+        from tests.scenario import RULES
+        group = create_group("Concurrent adoption", actor="test")
+        versions = []
+        errors = run_together(lambda n: versions.append(adopt_constitution(group.id, RULES, actor="test")),
+                              group.tenant_id)
+        self.assertEqual(errors, [])
+        self.assertEqual(sorted(versions), list(range(1, JOINERS + 1)))
+
+
 class ClosingWhileProposingTests(unittest.TestCase):
     """Closing a fund and proposing on it serialise on the fund row (ADR-0015):
     never a closed fund with an open proposal."""

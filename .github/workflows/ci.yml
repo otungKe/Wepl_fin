@@ -19,8 +19,10 @@ jobs:
           --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
     env:
       DB_HOST: localhost
-      DB_USER: wepl_app  # not a superuser, so row-level security applies (ADR-0009)
+      DB_USER: wepl_app  # not a superuser, so row-level security applies (ADR-0009); owns nothing (ADR-0027)
       DB_PASSWORD: wepl
+      DB_OWNER_USER: wepl_owner  # the test runner creates and migrates the test database as the owner
+      DB_OWNER_PASSWORD: owner
       WEPL_PROPERTY_EXAMPLES: "150"
     steps:
       - uses: actions/checkout@v4
@@ -30,12 +32,13 @@ jobs:
           cache: pip
           cache-dependency-path: backend/requirements-dev.txt
       - run: pip install -r backend/requirements-dev.txt
-      - name: Create the application database role
+      - name: Create the database roles (ADR-0027)
         env:
           PGPASSWORD: postgres
         run: |
-          psql -h localhost -U postgres -c "CREATE ROLE wepl_app LOGIN PASSWORD 'wepl' CREATEDB NOSUPERUSER NOBYPASSRLS"
-          psql -h localhost -U postgres -c "ALTER DATABASE wepl OWNER TO wepl_app"
+          psql -h localhost -U postgres -v db=wepl -f backend/scripts/database_roles.sql
+          psql -h localhost -U postgres -c "ALTER ROLE wepl_owner PASSWORD 'owner' CREATEDB" \
+                                        -c "ALTER ROLE wepl_app PASSWORD 'wepl'"
       - run: python manage.py makemigrations --check --dry-run
         working-directory: backend
       - run: python manage.py test -v 2
@@ -43,7 +46,7 @@ jobs:
       - name: Run the custody demo end to end
         working-directory: backend
         run: |
-          python manage.py migrate
+          DB_USER=wepl_owner DB_PASSWORD=owner python manage.py migrate
           python manage.py demo_custody_pilot
       - name: Restore drill (back up, restore, prove the copy is identical and works)
         working-directory: backend

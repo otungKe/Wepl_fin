@@ -63,6 +63,19 @@ DATABASES = {
     }
 }
 
+# ADR-0027: the application's role owns nothing; the schema owner runs the
+# migrations (deploy: DB_USER=wepl_owner python manage.py migrate). The
+# owner's login is configured here only for the test runner, which creates
+# and migrates the test database as the owner and then runs every test as
+# the application's role. Application servers never get DB_OWNER_USER.
+WEPL_SCHEMA_OWNER = os.environ.get("DB_OWNER_USER", "wepl_owner")
+if os.environ.get("DB_OWNER_USER"):
+    DATABASES["owner"] = {**DATABASES["default"], "USER": os.environ["DB_OWNER_USER"],
+                          "PASSWORD": os.environ.get("DB_OWNER_PASSWORD", ""), "ATOMIC_REQUESTS": False}
+    if not DEBUG:
+        raise RuntimeError("DB_OWNER_USER is for tests only: the application must not hold the owner's login.")
+TEST_RUNNER = "tests.database_roles.RuntimeRoleRunner"
+
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 USE_TZ = True
 TIME_ZONE = "Africa/Nairobi"

@@ -5,10 +5,11 @@
 # then proves the copy is the same and still works:
 #   1. every table's rows are identical (count and checksum);
 #   2. row-level security, its policies, the triggers and the database
-#      functions that guard the money are all still there;
-#   3. the application, connected to the copy, finds no unapplied
-#      migration, passes the ledger integrity check and can read the
-#      operator inbox.
+#      functions that guard the money are all still there, and so are who
+#      owns each table and what each role is granted (ADR-0027);
+#   3. the application, connected to the copy, finds its role owns nothing
+#      and holds no privilege it should not, finds no unapplied migration,
+#      passes the ledger integrity check and can read the operator inbox.
 # The scratch database and the backup file are removed at the end.
 #
 # Usage, from backend/:  scripts/restore_drill.sh SOURCE_DB
@@ -41,6 +42,10 @@ fingerprint() {
            WHERE NOT tgisinternal ORDER BY 1"
   q "$db" "SELECT 'function ' || proname || ' ' || md5(prosrc) FROM pg_proc
            WHERE pronamespace = 'public'::regnamespace ORDER BY 1"
+  q "$db" "SELECT 'grants ' || relname || ' ' || pg_get_userbyid(relowner) || ' ' || coalesce(relacl::text, '-')
+           FROM pg_class WHERE relnamespace = 'public'::regnamespace AND relkind IN ('r', 'S') ORDER BY 1"
+  q "$db" "SELECT 'default-grants ' || pg_get_userbyid(defaclrole) || ' ' || defaclobjtype::text || ' ' || defaclacl::text
+           FROM pg_default_acl ORDER BY 1"
 }
 
 echo "== Backing up $SOURCE"
@@ -67,6 +72,7 @@ fi
 echo "   identical: $(cut -d' ' -f1 "$DUMP.copy" | sort | uniq -c | xargs)"
 
 echo "== 3. The application on the copy"
+DB_NAME="$SCRATCH" python manage.py check --database default --fail-level WARNING  # tenancy.E001, E002
 DB_NAME="$SCRATCH" python manage.py migrate --check
 DB_NAME="$SCRATCH" python manage.py check_ledger_integrity
 # The inbox reads every group; the command needs a signed-in operator, so call the use case directly.

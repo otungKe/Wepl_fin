@@ -100,7 +100,7 @@ def propose_withdrawal(proposer_id: int, fund_id: int, *, amount, purpose: str, 
 def decide(proposal_id: int, voter_id: int, *, approve: bool, source: str = "app") -> ProposalView:
     """Record one member's decision. Repeating the same decision is a no-op,
     so a resent SMS reply is harmless; changing a recorded vote is refused."""
-    p = Proposal.objects.select_for_update().select_related("constitution").get(pk=proposal_id)
+    p = Proposal.objects.select_for_update(of=("self",)).select_related("constitution").get(pk=proposal_id)
     voter = membership(voter_id)
     previous = Approval.objects.filter(proposal=p, membership_id=voter.id).first()
     if previous is not None:
