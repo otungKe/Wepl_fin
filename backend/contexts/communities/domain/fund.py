@@ -8,8 +8,11 @@ from enum import StrEnum
 FUND_NAME_MAX = 80
 # A fund code is what a member adds to a pay-in reference to say which fund
 # the money is for, e.g. "0712597024 WEL" (ADR-0023). Letters only, so it
-# can never be read as a mobile number or a member code (M01).
-_FUND_CODE = re.compile(r"[A-Z]{2,6}")
+# can never be read as a mobile number or a member code (M01); at least three
+# so it is less often an ordinary word a payer types (Harry, 2026-10-06;
+# ADR-0026). A code means one fund of its group for good: it is never given
+# to another fund, even after that fund changes code or closes.
+_FUND_CODE = re.compile(r"[A-Z]{3,6}")
 _CURRENCY = re.compile(r"[A-Z]{3}")
 # Harry, 2026-10-01: the pilot holds Kenyan shillings only. Money, the ledger's
 # queries and custody's statements all assume KES today; allowing another
@@ -57,8 +60,8 @@ def check_currency(currency: str | None) -> str:
 
 
 def clean_fund_code(code: str | None) -> str:
-    """Two to six letters, kept in capitals; payers may type any case."""
+    """Three to six letters, kept in capitals; payers may type any case."""
     code = (code or "").strip().upper()
     if not _FUND_CODE.fullmatch(code):
-        raise FundError(f"A fund code is two to six letters (e.g. WEL); {code!r} is not.")
+        raise FundError(f"A fund code is three to six letters (e.g. WEL); {code!r} is not.")
     return code

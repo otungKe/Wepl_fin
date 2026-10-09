@@ -7,9 +7,11 @@ unittest.TestCase: its rows are committed in a tenant of its own, invisible
 to every other tenant, and Django runs such tests after all its own test
 cases. The test database is destroyed at the end of the run."""
 import threading
+import time
 import unittest
+import uuid
 
-from django.db import connection
+from django.db import connection, transaction
 
 from contexts.audit.public import history
 from contexts.communities.infrastructure.models import Fund
@@ -17,7 +19,11 @@ from contexts.communities.public import (CommunityError, add_member, close_fund,
                                          members, membership, open_fund)
 from contexts.governance.public import (Capability, GovernanceError, adopt_constitution, grant, proposal_view,
                                         propose_withdrawal)
+from contexts.custody.infrastructure.models import Alert
+from contexts.ledger.public import fund_position
+from contexts.shared_kernel.money import Money
 from contexts.tenancy.public import tenant
+from simulators.custodian_bank import bank
 
 JOINERS = 8
 
@@ -131,6 +137,81 @@ class ClosingWhileProposingTests(unittest.TestCase):
                 self.assertEqual([p for p in proposed if proposal_view(p).status == "open"], [])
             else:
                 self.assertTrue(proposed)
+
+
+class ClosingWhileReceivingTests(unittest.TestCase):
+    """A pay-in quoting a fund's code and closing that fund serialise on the
+    fund row (communities 0019, ADR-0026): a closed fund never holds money.
+    Before, both committed and the fund closed holding the pay-in (review of
+    2026-10-06, C1)."""
+    databases = {"default"}  # so the runner builds the test database even when run alone
+
+    def setUp(self):
+        from tests.scenario import Scenario
+        self.account = f"77{uuid.uuid4().int % 10 ** 11:011d}"
+        self.s = Scenario(name=f"Close while receiving {self.account}", account=self.account)
+        with self.s.acting():
+            self.welfare = open_fund(self.s.group.id, name="Welfare", code="WEL", actor="test")
+        bank.deposit(self.account, "500", msisdn="254712000001", name="WANJIKU K", reference="M01 WEL")
+
+    def receive(self):
+        self.s.sync()
+
+    def close(self):
+        with tenant(self.s.tenant_id):
+            close_fund(self.welfare.id, actor="test")
+
+    def test_a_pay_in_first_keeps_the_fund_open(self):
+        errors = first_holds_then_second(self.receive, self.close)
+        self.assertEqual(len(errors), 1)
+        self.assertIsInstance(errors[0], CommunityError)
+        self.assertIn("still holds money", str(errors[0]))
+        with tenant(self.s.tenant_id):
+            self.assertTrue(fund_view(self.welfare.id).is_open)
+            self.assertEqual(fund_position(self.welfare.id).cash, Money("500"))
+
+    def test_closing_first_sends_the_pay_in_to_the_default_fund_with_an_alert(self):
+        self.assertEqual(first_holds_then_second(self.close, self.receive), [])
+        with tenant(self.s.tenant_id):
+            self.assertFalse(fund_view(self.welfare.id).is_open)
+            self.assertEqual(fund_position(self.welfare.id).cash, Money("0"))
+            self.assertEqual(fund_position(self.s.fund.id).cash, Money("500"))
+            self.assertTrue(Alert.objects.filter(kind=Alert.Kind.FUND_CODE_UNCLEAR).exists())
+
+
+def first_holds_then_second(first, second, *, hold=1.0) -> list[Exception]:
+    """Run ``first`` in a transaction that stays open ``hold`` seconds after it
+    finishes, start ``second`` on another connection meanwhile, then commit
+    ``first``. Each runs on its own thread."""
+    done, errors = threading.Event(), []
+
+    def run_first():
+        try:
+            with transaction.atomic():
+                first()
+                done.set()
+                time.sleep(hold)  # the second is now waiting on our locks, or racing past them
+        except Exception as exc:
+            errors.append(exc)
+        finally:
+            done.set()
+            connection.close()
+
+    def run_second():
+        try:
+            done.wait()
+            second()
+        except Exception as exc:
+            errors.append(exc)
+        finally:
+            connection.close()
+
+    threads = [threading.Thread(target=run_first), threading.Thread(target=run_second)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    return errors
 
 
 def run_together(action, tenant_id) -> list[Exception]:

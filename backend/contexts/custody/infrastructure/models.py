@@ -99,6 +99,7 @@ class Alert(models.Model):
         UNMATCHED_OUTFLOW = "unmatched_outflow", "Money left without an approved mandate"
         RECONCILIATION_DIFFERENCE = "recon_difference", "Books and custodian disagree"
         STATEMENT_CONFLICT = "statement_conflict", "Custodian sent conflicting data for a transaction"
+        FUND_CODE_UNCLEAR = "fund_code_unclear", "A pay-in's reference named no one fund"  # ADR-0026
 
     group = models.ForeignKey(GROUP, on_delete=models.PROTECT, related_name="+")
     kind = models.CharField(max_length=20, choices=Kind.choices)

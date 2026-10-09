@@ -1,12 +1,22 @@
 from contexts.identity.public import people
+from contexts.tenancy.public import current_tenant, require_cross_tenant
 
 from ..contract import CommunityError, FundView, GroupView, MembershipView
 from ..infrastructure.models import Fund, Group, Membership
 
 
+def _scoped() -> None:
+    """Every query reads inside a tenant or a declared cross-tenant operation.
+    Anywhere else row-level security shows nothing, and an empty list must
+    never be mistaken for "the group has no funds" (review of 2026-10-06, I7)."""
+    if current_tenant() is None:
+        require_cross_tenant()
+
+
 def group_view(group_id: int) -> GroupView:
     """Raises CommunityError for an unknown group or, under row-level
     security, another tenant's: the two are indistinguishable."""
+    _scoped()
     g = Group.objects.filter(pk=group_id).first()
     if g is None:
         raise CommunityError(f"Unknown group {group_id}.")
@@ -16,12 +26,14 @@ def group_view(group_id: int) -> GroupView:
 def groups() -> list[GroupView]:
     """The groups visible here: under row-level security, the current
     tenant's one group (ADR-0010)."""
+    _scoped()
     return [GroupView(id=g.pk, tenant_id=g.tenant_id, name=g.name) for g in Group.objects.order_by("pk")]
 
 
 def fund_view(fund_id: int) -> FundView:
     """Raises CommunityError for an unknown fund or, under row-level
     security, another tenant's: the two are indistinguishable."""
+    _scoped()
     f = Fund.objects.filter(pk=fund_id).first()
     if f is None:
         raise CommunityError(f"Unknown fund {fund_id}.")
@@ -33,6 +45,7 @@ def _fund(f: Fund) -> FundView:
 
 
 def funds(group_id: int, *, open_only: bool = True) -> list[FundView]:
+    _scoped()
     qs = Fund.objects.filter(group_id=group_id)
     if open_only:
         qs = qs.filter(status="open")
@@ -51,6 +64,7 @@ def _views(rows) -> list[MembershipView]:
 def membership(membership_id: int) -> MembershipView:
     """Raises CommunityError for an id that does not exist or, under row-level
     security, belongs to another tenant: the two are indistinguishable."""
+    _scoped()
     views = _views(Membership.objects.filter(pk=membership_id))
     if not views:
         raise CommunityError(f"Unknown member {membership_id}.")
@@ -58,6 +72,7 @@ def membership(membership_id: int) -> MembershipView:
 
 
 def members(group_id: int, *, active_only: bool = True) -> list[MembershipView]:
+    _scoped()
     qs = Membership.objects.filter(group_id=group_id)
     if active_only:
         qs = qs.filter(status="active")
