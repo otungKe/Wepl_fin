@@ -1,10 +1,10 @@
 from django.test import SimpleTestCase
 
-from contexts.custody.domain.routing import fund_for, split_across_funds, unknown_words
+from contexts.custody.domain.routing import fund_for, split_across_funds, unclear_code, unknown_words
 from contexts.governance.contract import AccountReturns
 from contexts.shared_kernel.money import Money
 
-CODES, DEFAULT, WELFARE = {"WEL": 2}, 1, 2
+CODES, DEFAULT, WELFARE = {"WEL": 2, "EDU": 3}, 1, 2
 
 
 class FundForTests(SimpleTestCase):
@@ -18,6 +18,17 @@ class FundForTests(SimpleTestCase):
         for reference in ("0712597024", "M05", "0712597024 WLF", "", "WELFARE"):
             with self.subTest(reference):
                 self.assertEqual(fund_for(reference, CODES, DEFAULT), (DEFAULT, reference))
+
+    def test_two_funds_named_is_no_fund_named(self):
+        self.assertEqual(fund_for("WEL EDU", CODES, DEFAULT), (DEFAULT, "WEL EDU"))
+        self.assertEqual(fund_for("WEL 0712597024 wel", CODES, DEFAULT), (WELFARE, "0712597024 wel"))
+
+    def test_unclear_says_why_only_when_no_one_fund_is_named(self):
+        self.assertEqual(unclear_code("WEL EDU", CODES), "it quotes the codes of two funds (WEL and EDU)")
+        self.assertEqual(unclear_code("0712597024 WLF", CODES), "WLF is not the code of one of the group's open funds")
+        for clear in ("0712597024 WEL", "M05", "WEL JAN", ""):
+            with self.subTest(clear):
+                self.assertEqual(unclear_code(clear, CODES), "")
 
     def test_unknown_words_ignore_member_codes(self):
         self.assertEqual(unknown_words("M05 WEL 0712597024", CODES), [])

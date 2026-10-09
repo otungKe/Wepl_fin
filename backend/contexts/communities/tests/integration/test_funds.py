@@ -6,9 +6,9 @@ from django.db import DatabaseError, IntegrityError, transaction
 from django.test import TestCase
 
 from contexts.audit.public import history
-from contexts.communities.infrastructure.models import Fund
+from contexts.communities.infrastructure.models import Fund, FundCode
 from contexts.communities.public import (CommunityError, add_member, close_fund, create_group, fund_view, open_fund,
-                                         rename_fund)
+                                         rename_fund, set_fund_code)
 from contexts.custody.public import CustodyError, link_external_account
 from contexts.governance.public import Capability, GovernanceError, grant, adopt_constitution, cancel_proposal, propose_withdrawal
 from contexts.ledger.public import (AccountKey, AccountPurpose, JournalDraft, Side, fund_holds_nothing, post_journal,
@@ -191,6 +191,48 @@ class LifecycleTests(TestCase):
         reverse_journal(entry, idempotency_key="t-1-reversal")
         self.assertTrue(fund_holds_nothing(self.fund.id))
         self.assertEqual(close_fund(self.fund.id, actor="t").status, "closed")
+
+
+class ClosedFundsAndCodesTests(TestCase):
+    """What PostgreSQL refuses whoever writes (review of 2026-10-06, C1-C3; ADR-0026)."""
+
+    def setUp(self):
+        self.group = create_group("G", actor="t")
+        self.enterContext(tenant(self.group.tenant_id))
+        self.fund = open_fund(self.group.id, name="Welfare", code="WEL", actor="t")
+
+    def post(self, n):
+        key = lambda purpose: AccountKey(group_id=self.group.id, fund_id=self.fund.id, purpose=purpose)
+        return post_journal(JournalDraft.build(
+            idempotency_key=f"t-{n}", group_id=self.group.id, fund_id=self.fund.id, kind="test", cause_type="test",
+            cause_id=str(n), postings=[(key(AccountPurpose.UNEXPLAINED_OUT), Side.DEBIT, Money("100")),
+                                       (key(AccountPurpose.RETAINED), Side.CREDIT, Money("100"))]))
+
+    def test_a_closed_fund_takes_no_money(self):
+        reverse_journal(self.post(1), idempotency_key="t-1-reversal")
+        close_fund(self.fund.id, actor="t")
+        with self.assertRaisesMessage(DatabaseError, "is closed: it takes no money"), transaction.atomic():
+            self.post(2)
+        self.assertTrue(fund_holds_nothing(self.fund.id))
+
+    def test_a_status_is_open_or_closed_and_nothing_else(self):
+        """'archived' would step around governance's and custody's close guards, which fire on 'closed'."""
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            Fund.objects.filter(pk=self.fund.id).update(status="archived")
+
+    def test_a_code_once_used_never_means_another_fund(self):
+        set_fund_code(self.fund.id, "WLF", actor="t")
+        other = open_fund(self.group.id, name="Other", actor="t")
+        with self.assertRaisesMessage(IntegrityError, "belongs to fund"), transaction.atomic():
+            Fund.objects.filter(pk=other.id).update(code="WEL")  # around the use case: the database refuses too
+        with self.assertRaisesMessage(IntegrityError, "community_fund_code_letters"), transaction.atomic():
+            Fund.objects.filter(pk=other.id).update(code="WE")
+        self.assertEqual(sorted(FundCode.objects.filter(group_id=self.group.id).values_list("code", "fund_id")),
+                         [("WEL", self.fund.id), ("WLF", self.fund.id)])
+        for change in (lambda q: q.update(fund_id=other.id), lambda q: q.delete()):
+            with self.subTest(change), self.assertRaisesMessage(DatabaseError, "stays its fund's"), \
+                    transaction.atomic():
+                change(FundCode.objects.filter(code="WEL"))
 
 
 class OtherContextsAndAClosedFundTests(TestCase):

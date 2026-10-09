@@ -15,7 +15,7 @@ from contexts.tenancy.public import cross_tenant, tenant
 
 from ..contract import IngestResult
 from ..domain.attribution import quoted_msisdn
-from ..domain.routing import fund_for, unknown_words
+from ..domain.routing import fund_for, quoted_codes, unknown_words
 from ..infrastructure.models import ExternalAccount
 from .ingestion import fund_codes, ingest
 
@@ -42,6 +42,8 @@ def check_reference(account_number: str, reference: str) -> ReferenceCheck:
         codes = fund_codes(ea.group_id)
         if unknown := unknown_words(reference, codes):
             return ReferenceCheck(False, reason=f"{unknown[0]} is not the code of one of this group's funds.")
+        if len({codes[c] for c in quoted_codes(reference, codes)}) > 1:
+            return ReferenceCheck(False, reason="Quote the code of one fund only.")
         reference = fund_for(reference, codes, ea.fund_id)[1]
         current = members(ea.group_id)
         number = quoted_msisdn(reference)

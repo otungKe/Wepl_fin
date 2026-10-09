@@ -33,8 +33,12 @@ the questions still open with the bank.
    - **which fund.** One account holds all the group's funds (ADR-0023).
      A deposit goes to the fund whose code is in the reference
      (`domain/routing.fund_for`), else the default fund
-     (`ExternalAccount.fund`). A withdrawal goes to its mandate's fund;
-     an unmatched one to the default fund.
+     (`ExternalAccount.fund`). Ingestion locks that fund (`hold_open_fund`)
+     and routes again if it just closed. Unknown letters, or two funds'
+     codes, go to the default fund with a `fund_code_unclear` alert, settled
+     by `move_pay_in` or `keep_pay_in` (ADR-0026). A code is its fund's for
+     good, and PostgreSQL refuses any entry into a closed fund. A withdrawal
+     goes to its mandate's fund; an unmatched one to the default fund.
    - **deposit.** `domain/attribution.attribute` looks for a member code in the
      reference or narration, then a remembered payer (`PayerMapping`), then
      the member's own number. Otherwise the money goes to `unattributed_in`

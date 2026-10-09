@@ -7,7 +7,9 @@ from enum import StrEnum
 
 class OperatorCapability(StrEnum):
     INBOX = "operations.inbox"          # read every group's open problems
-    GROUPS_SETUP = "groups.setup"       # found a group, add members, adopt a constitution
+    # found a group; add a member or record that they left; open, rename,
+    # code or close a fund; adopt a constitution (ADR-0026)
+    GROUPS_SETUP = "groups.setup"
     CUSTODY_LINK = "custody.link"       # link or close a group's bank account
     OPERATORS_MANAGE = "operators.manage"
 

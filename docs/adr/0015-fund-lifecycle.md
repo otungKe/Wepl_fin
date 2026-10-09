@@ -27,15 +27,18 @@ into the others.
 
 | Condition | Owner | Enforced by |
 |---|---|---|
-| Nothing is held: every ledger account of the fund is at zero, in every currency | ledger | `close_fund` asks `ledger.public.fund_holds_nothing` under the fund's row lock |
+| Nothing is held: every ledger account of the fund is at zero, in every currency | ledger | `close_fund` asks `ledger.public.fund_holds_nothing` under the fund's row lock; every journal entry takes a share lock on its fund and is refused once it is closed (communities 0019, ADR-0026) |
 | No open proposal and no unexecuted (issued) mandate | governance | a trigger on closing (governance 0005). A new proposal takes a share lock on its fund, so it and closing serialise. |
 | No fund transfer naming it that is open, or approved but not booked (ADR-0024) | governance | the same trigger (governance 0009). A new transfer takes a share lock on both funds. |
 | No linked custodian account that is still open | custody | a trigger on closing (custody 0004, 0007). Linking takes a share lock on the fund. |
 
 **Consequences:**
-- **No posting can reach a closed fund.** Every posting comes through a
-  linked custodian account, and a closed fund can have none. INFERRED from
-  the code: custody is the ledger's only caller.
+- **No posting can reach a closed fund.** ~~Every posting comes through a
+  linked custodian account, and a closed fund can have none.~~ That stopped
+  being true when one account came to hold all of a group's funds
+  (ADR-0023): a fund without an account of its own receives pay-ins quoting
+  its code. Since ADR-0026, PostgreSQL refuses any journal entry into a
+  closed fund and serialises it with closing (communities 0019).
 - **A fund with a custodian account closes once that account is closed.**
   See the addendum below (2026-10-04).
 - **Communities and the ledger still don't hold each other's tables.**
