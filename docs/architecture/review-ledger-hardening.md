@@ -386,10 +386,14 @@ That is a decision for when fees exist.
    tables. Add a test that the runtime role cannot `ALTER`, `UPDATE` or
    `DISABLE TRIGGER`. Do this before production and the bank's due
    diligence; it does not block the next context.
+   *Done 2026-10-09:* ADR-0027, accepted and built (tenancy 0003,
+   `scripts/database_roles.sql`, `tenancy.E002`, `tests/test_database_roles.py`).
 3. **M2, database rule,** after the Communities change lands: an account's
    currency equals its fund's, in `communities_ledger_names_its_own_fund`.
-4. **After step 2, optionally:** replace the setting-based seal with an
-   `xmin`-based one (H1).
+4. **After step 2:** replace the setting-based seal with an `xmin`-based one
+   (H1). Re-verified after the split: the application's role can still
+   forge the setting and add a balanced pair to an old entry (ADR-0027,
+   "The seal after the split"). Medium; do it before real money.
 5. **Only if Harry wants it:** a nightly warning, not a failure, for
    negative member or retained balances (F1).
 
@@ -430,7 +434,7 @@ the deeper rule they test.
 ### Still worth adding (not done)
 
 - **H1:** a test that the runtime role cannot alter or update ledger tables,
-  once the roles are split.
+  once the roles are split. *Done 2026-10-09:* `tests/test_database_roles.py`.
 - **A property test:** random histories of postings, reversals and transfers
   keep `check_books` passing, in `tests/test_properties.py`.
 - **A custody race:** a transfer racing a payout on the same fund through

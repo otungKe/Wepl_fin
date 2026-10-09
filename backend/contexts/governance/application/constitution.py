@@ -4,10 +4,11 @@ from contexts.audit.public import record
 from contexts.communities.public import CommunityError, fund_view
 
 from ..domain.rules import REQUIRED_CHOICES, ConstitutionRules, RulesError
+from ..infrastructure.locks import lock_constitution
 from ..infrastructure.models import Constitution
 
 
-@transaction.atomic  # version numbers are assigned under a lock on the latest version
+@transaction.atomic  # version numbers are assigned under a lock on the group's constitution
 def adopt_constitution(group_id: int, rules: dict, *, actor: str) -> int:
     """Adopt a new version. Earlier versions stay, and proposals keep the
     version they were made under. (Pilot: the group signs it off on paper.)"""
@@ -22,7 +23,8 @@ def adopt_constitution(group_id: int, rules: dict, *, actor: str) -> int:
             fund = None
         if fund is None or fund.group_id != group_id or not fund.is_open:
             raise RulesError(f"Fund {fund_id} is not an open fund of this group; a contribution rule cannot name it.")
-    latest = Constitution.objects.select_for_update().filter(group_id=group_id).order_by("-version").first()
+    lock_constitution(group_id)
+    latest = Constitution.objects.filter(group_id=group_id).order_by("-version").first()
     version = latest.version + 1 if latest else 1
     c = Constitution.objects.create(group_id=group_id, version=version, rules=parsed.to_dict(), adopted_by=actor)
     record(actor, "constitution.adopted", target_type="constitution", target_id=c.pk, group_id=group_id,

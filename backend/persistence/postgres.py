@@ -3,7 +3,11 @@
 
 def append_only(table: str) -> tuple[str, str]:
     """Return (forward, reverse) SQL making ``table`` reject UPDATE, DELETE and
-    TRUNCATE. Corrections are new rows, never edits."""
+    TRUNCATE. Corrections are new rows, never edits.
+
+    Two independent locks (ADR-0027): the trigger refuses every role, and the
+    application's role is not even granted UPDATE. It never had DELETE or
+    TRUNCATE. The role comes from scripts/database_roles.sql."""
     fn = f"{table}_append_only"
     forward = f"""
     CREATE OR REPLACE FUNCTION {fn}() RETURNS trigger LANGUAGE plpgsql AS $$
@@ -15,6 +19,7 @@ def append_only(table: str) -> tuple[str, str]:
         FOR EACH ROW EXECUTE FUNCTION {fn}();
     CREATE TRIGGER {fn}_truncate BEFORE TRUNCATE ON {table}
         FOR EACH STATEMENT EXECUTE FUNCTION {fn}();
+    REVOKE UPDATE ON {table} FROM wepl_runtime;
     """
     reverse = f"""
     DROP TRIGGER IF EXISTS {fn}_row ON {table};

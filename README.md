@@ -18,13 +18,29 @@ Requirements: Python 3.12 and PostgreSQL 16.
 python3.12 -m venv .venv && . .venv/bin/activate
 pip install -r backend/requirements-dev.txt
 cd backend
-# The app connects as wepl_app: not a superuser, so row-level security binds it (ADR-0009).
-psql -U postgres -c "CREATE ROLE wepl_app LOGIN PASSWORD 'wepl' CREATEDB NOSUPERUSER NOBYPASSRLS"
-createdb -U postgres -O wepl_app wepl   # DB_NAME, DB_USER, DB_PASSWORD, DB_HOST, DB_PORT override the defaults
-python manage.py migrate
-python manage.py test              # the full suite, against real Postgres
+# Three roles (ADR-0027); the script also creates the database, owned by wepl_owner.
+psql -U postgres -v db=wepl -f scripts/database_roles.sql
+psql -U postgres -c "ALTER ROLE wepl_owner PASSWORD 'owner' CREATEDB" -c "ALTER ROLE wepl_app PASSWORD 'wepl'"
+export DB_PASSWORD=wepl            # DB_NAME, DB_USER, DB_PASSWORD, DB_HOST, DB_PORT override the defaults
+export DB_OWNER_USER=wepl_owner DB_OWNER_PASSWORD=owner   # for the test runner only
+DB_USER=wepl_owner DB_PASSWORD=owner python manage.py migrate   # only the owner migrates
+python manage.py test              # the full suite, against real Postgres, as wepl_app
 python manage.py demo_custody_pilot     # the scripted custody demo
 ```
+
+### Database roles (ADR-0027)
+
+| Role | What it is | What it may do |
+|---|---|---|
+| `wepl_owner` | Owns the schema; runs `migrate` | Everything on its own tables. Its login stays with WEPL operations, never on the application servers |
+| `wepl_runtime` | Cannot log in; holds the application's privileges | `SELECT, INSERT` everywhere; `UPDATE` where a row's state changes; never `UPDATE` on an append-only table; never `DELETE`, `TRUNCATE`, `REFERENCES` or `TRIGGER` |
+| `wepl_app` | The application's login, a member of `wepl_runtime` | What `wepl_runtime` may. Owns nothing |
+
+None is a superuser or BYPASSRLS, so row-level security binds all three
+(ADR-0009). The application refuses to start (`tenancy.E002`) if its role
+owns a table or holds a privilege it should not. A database migrated before
+ADR-0027 belongs to `wepl_app`: running `scripts/database_roles.sql` again
+hands it to `wepl_owner`, and the next `migrate` grants the rest.
 
 | Command | What it does |
 |---|---|

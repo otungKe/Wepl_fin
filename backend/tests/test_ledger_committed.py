@@ -39,7 +39,9 @@ class SealedEntryTests(unittest.TestCase):
 
     def test_truncate_is_refused_as_the_application_role(self):
         """ADR-0003 acceptance, immutable history: in a fresh transaction, with
-        nothing pending, TRUNCATE reaches the append-only trigger and fails."""
+        nothing pending, TRUNCATE is refused. The application's role has no
+        TRUNCATE privilege (ADR-0027); tests/test_database_roles.py proves the
+        append-only trigger refuses it even for the schema owner."""
         group = create_group("Truncate", actor="test")
         with tenant(group.tenant_id):
             fund = open_fund(group.id, name="Main savings", actor="test")
@@ -52,7 +54,8 @@ class SealedEntryTests(unittest.TestCase):
             c.execute("SELECT current_user, rolsuper, rolbypassrls FROM pg_roles WHERE rolname = current_user")
             self.assertEqual(c.fetchone(), ("wepl_app", False, False))
         for table in ("ledger_journalline", "ledger_journalentry", "ledger_account"):
-            with self.subTest(table), self.assertRaisesRegex(DatabaseError, "append-only"), transaction.atomic():
+            with self.subTest(table), self.assertRaisesRegex(DatabaseError, "permission denied"), \
+                    transaction.atomic():
                 with connection.cursor() as c:
                     c.execute(f"TRUNCATE {table} CASCADE")
         with tenant(group.tenant_id):
