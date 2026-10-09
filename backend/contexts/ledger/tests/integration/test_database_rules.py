@@ -50,8 +50,10 @@ class Book:
                 Account.objects.get(fund_id=self.fund.id, purpose="retained"))
 
     def raw_entry(self, idem, **kw):
+        cause = (("journal_entry", str(kw["reverses_id"])) if kw.get("reverses_id") else ("raw", idem))
         return JournalEntry.objects.create(idempotency_key=idem, fingerprint="", group_id=self.group.id,
-                                           fund_id=self.fund.id, kind="raw", cause_type="raw", cause_id=idem, **kw)
+                                           fund_id=self.fund.id, kind="raw", cause_type=cause[0], cause_id=cause[1],
+                                           **kw)
 
 
 class DatabaseRuleTests(TestCase):
@@ -161,3 +163,35 @@ class ResolveTests(TestCase):
                          currency="kes")
         with tenant(self.a.group.tenant_id), self.assertRaisesMessage(IntegrityError, "currency_code"):
             resolve(bad)  # was reported as Account.DoesNotExist
+
+
+class EntryIdentityRuleTests(TestCase):
+    """What the domain requires of an entry's identity, PostgreSQL requires
+    too (ledger 0010), so a raw write cannot weaken idempotency or tracing."""
+
+    def setUp(self):
+        self.a = Book("A")
+        self.enterContext(tenant(self.a.group.tenant_id))
+        self.entry = self.a.post("a1")
+
+    def create(self, **kw):
+        fields = dict(idempotency_key="raw", fingerprint="", group_id=self.a.group.id, fund_id=self.a.fund.id,
+                      kind="reversal", cause_type="journal_entry", cause_id=str(self.entry), reverses_id=None)
+        return JournalEntry.objects.create(**{**fields, **kw})
+
+    def refused(self, rule, **kw):
+        with self.assertRaisesMessage(DatabaseError, rule), transaction.atomic():
+            self.create(**kw)
+
+    def test_a_reversals_cause_is_the_entry_it_reverses(self):
+        other = self.a.post("a2")
+        self.refused("ledger_reversal_names_its_original", reverses_id=self.entry, cause_id=str(other))
+        self.refused("ledger_reversal_names_its_original", reverses_id=self.entry, cause_type="t")
+
+    def test_a_fund_transfer_leg_reverses_nothing(self):
+        self.refused("ledger_reversal_names_its_original", reverses_id=self.entry, kind="fund_transfer_out")
+
+    def test_every_entry_has_a_kind_and_a_cause(self):
+        for field in ("kind", "cause_type", "cause_id"):
+            with self.subTest(field):
+                self.refused("ledger_entry_has_kind_and_cause", **{field: ""})

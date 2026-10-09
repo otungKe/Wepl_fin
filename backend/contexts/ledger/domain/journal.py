@@ -44,9 +44,11 @@ class JournalDraft:
 
     def __post_init__(self):
         object.__setattr__(self, "postings", tuple(self.postings))
-        object.__setattr__(self, "cause_id", str(self.cause_id))
         if not self.idempotency_key:
             raise LedgerError("Every entry needs an idempotency key.")
+        if not self.kind or not self.cause_type or self.cause_id is None or str(self.cause_id) == "":
+            raise LedgerError("Every entry needs a kind and a cause, so it can be traced back.")
+        object.__setattr__(self, "cause_id", str(self.cause_id))
         if self.reverses_entry_id is not None and (self.cause_type, self.cause_id) != (
                 "journal_entry", str(self.reverses_entry_id)):
             # The cause is in the fingerprint, so this makes the reversed
