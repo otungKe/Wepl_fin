@@ -166,15 +166,18 @@ class PostingTests(RealBooks, TestCase):
         self.assertTrue(fund_position(self.fund_id).invariant_holds)
 
     def test_a_members_movements_and_the_trial_balance_stay_in_one_currency(self):
-        """The ledger accepts accounts in another currency (review 2026-10-06,
-        M2), so no query may add amounts across currencies."""
+        """Should a second currency ever reach a fund's books (today only a
+        restore could put one there: communities 0020), no query may add
+        amounts across currencies."""
+        from contexts.ledger.tests.integration.test_database_rules import accounts_in_any_currency
         post_journal(self.draft("kes", "100"))
         usd = lambda p, **kw: AccountKey(self.group_id, self.fund_id, p, currency="USD", **kw)
-        post_journal(JournalDraft(idempotency_key="usd", group_id=self.group_id, fund_id=self.fund_id, kind="t",
-                                  cause_type="t", cause_id="usd", postings=(
-                                      Posting(usd(AccountPurpose.UNEXPLAINED_OUT), D, Money("7", "USD")),
-                                      Posting(usd(AccountPurpose.MEMBER_INTEREST, member_id=self.member_id), C,
-                                              Money("7", "USD")))))
+        with accounts_in_any_currency():
+            post_journal(JournalDraft(idempotency_key="usd", group_id=self.group_id, fund_id=self.fund_id, kind="t",
+                                      cause_type="t", cause_id="usd", postings=(
+                                          Posting(usd(AccountPurpose.UNEXPLAINED_OUT), D, Money("7", "USD")),
+                                          Posting(usd(AccountPurpose.MEMBER_INTEREST, member_id=self.member_id), C,
+                                                  Money("7", "USD")))))
         from contexts.ledger.public import member_movements
         self.assertEqual([r["balance"] for r in member_movements(self.fund_id, self.member_id)], [Money("100").amount])
         self.assertEqual([r["balance"] for r in member_movements(self.fund_id, self.member_id, "USD")],

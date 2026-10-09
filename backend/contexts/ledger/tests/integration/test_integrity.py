@@ -14,7 +14,7 @@ from contexts.ledger.contract import AccountKey, AccountPurpose
 from contexts.ledger.infrastructure.accounts import resolve
 from contexts.ledger.infrastructure.models import Account, IntegrityCheck, JournalEntry, JournalLine
 from contexts.ledger.public import check_books
-from contexts.ledger.tests.integration.test_database_rules import Book
+from contexts.ledger.tests.integration.test_database_rules import Book, accounts_in_any_currency
 from contexts.notifications.public import topics_since
 from contexts.shared_kernel.money import Money
 from contexts.tenancy.public import cross_tenant, tenant
@@ -163,7 +163,8 @@ class BypassedRulesTests(TestCase):
     def test_a_surplus_in_one_currency_cannot_hide_a_shortfall_in_another(self):
         """Before 2026-10-06 the KES check's trial balance summed every
         currency of the fund: 10 KES out and 10 USD in made zero."""
-        usd = resolve(AccountKey(self.a.group.id, self.a.fund.id, AccountPurpose.RETAINED, currency="USD"))
+        with accounts_in_any_currency():
+            usd = resolve(AccountKey(self.a.group.id, self.a.fund.id, AccountPurpose.RETAINED, currency="USD"))
         with balance_rules_off():
             self.entry("mixed", (self.out, "D", 10), (usd, "C", 10))
         checks = {c.currency: c for c in check_books()}

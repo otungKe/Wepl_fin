@@ -75,8 +75,10 @@ class LedgerAcceptanceTests(TestCase):
         database as in the domain."""
         self.post("seed", [(self.cash, D, Money("1")), (self.retained, C, Money("1"))])
         kes = Account.objects.get(purpose="custody_cash")
-        usd = Account.objects.create(purpose="retained", group_id=self.g, fund_id=self.f, currency="USD",
-                                     normal_side="C")
+        from contexts.ledger.tests.integration.test_database_rules import accounts_in_any_currency
+        with accounts_in_any_currency():  # funds are KES only; the balance rule must still hold if one got in
+            usd = Account.objects.create(purpose="retained", group_id=self.g, fund_id=self.f, currency="USD",
+                                         normal_side="C")
 
         def kes_against_usd():
             e = self.raw_entry("fx")
