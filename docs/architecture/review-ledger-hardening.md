@@ -151,6 +151,7 @@ two queries added amounts across currencies.** *Real defect in queries
   ledger rows against `communities_fund`. The Communities thread is changing
   that trigger now (posting into a closed fund), so add the rule after that
   change lands.
+  *Done 2026-10-09:* communities 0020 (`communities_account_in_its_funds_currency`).
 
 **M3. The integrity check was not independent of what it checks.** *Real
 monitoring defect; fixed.*

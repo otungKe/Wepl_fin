@@ -1,6 +1,8 @@
 """What PostgreSQL refuses on its own, whatever code writes to the ledger
 (ledger 0005; docs/architecture/review-ledger-infrastructure.md). Each test is
 one write the database used to accept."""
+from contextlib import contextmanager
+
 from django.db import IntegrityError, connection, transaction
 from django.db.utils import DatabaseError
 from django.test import TestCase
@@ -20,6 +22,25 @@ def check_deferred():
     with connection.cursor() as c:
         c.execute("SET CONSTRAINTS ALL IMMEDIATE")
         c.execute("SET CONSTRAINTS ALL DEFERRED")
+
+
+@contextmanager
+def accounts_in_any_currency():
+    """Turn off communities 0020 (an account is in its fund's currency) for
+    the block, as a restore or the schema owner could, so a test can make
+    a second currency's account and prove the ledger still keeps the two
+    apart. Funds are KES only, so nothing else can make one."""
+    with connection.cursor() as c:
+        c.execute("SET CONSTRAINTS ALL IMMEDIATE")  # ALTER TABLE refuses while trigger events are pending
+        c.execute("SET CONSTRAINTS ALL DEFERRED")
+        c.execute("ALTER TABLE ledger_account DISABLE TRIGGER communities_account_in_its_funds_currency")
+    try:
+        yield
+    finally:
+        with connection.cursor() as c:
+            c.execute("SET CONSTRAINTS ALL IMMEDIATE")
+            c.execute("SET CONSTRAINTS ALL DEFERRED")
+            c.execute("ALTER TABLE ledger_account ENABLE TRIGGER communities_account_in_its_funds_currency")
 
 
 def as_a_later_transaction():
@@ -157,6 +178,16 @@ class ResolveTests(TestCase):
             wrong = AccountKey(group_id=self.b.group.id, fund_id=self.a.fund.id, purpose=AccountPurpose.RETAINED)
             with self.assertRaisesMessage(LedgerError, "another group"):
                 resolve(wrong)
+
+    def test_an_account_is_in_its_funds_currency(self):
+        """A KES fund holds no USD account (communities 0020), so its money
+        can never fall outside the fund's balances."""
+        usd = AccountKey(group_id=self.a.group.id, fund_id=self.a.fund.id, purpose=AccountPurpose.RETAINED,
+                         currency="USD")
+        with tenant(self.a.group.tenant_id):
+            with self.assertRaisesMessage(IntegrityError, "is in USD, but fund"), transaction.atomic():
+                resolve(usd)
+            self.assertFalse(Account.objects.filter(currency="USD").exists())
 
     def test_a_refusal_other_than_a_lost_race_is_not_hidden(self):
         bad = AccountKey(group_id=self.a.group.id, fund_id=self.a.fund.id, purpose=AccountPurpose.RETAINED,
