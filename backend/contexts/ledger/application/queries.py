@@ -6,6 +6,7 @@ from django.db.models import Case, DecimalField, F, Sum, Value, When
 from contexts.shared_kernel.money import Money
 
 from ..domain.accounts import AccountKey, AccountPurpose, Side
+from ..domain.journal import LedgerError
 from ..domain.position import FundPosition
 from ..infrastructure import accounts
 from ..infrastructure.models import JournalEntry, JournalLine
@@ -31,7 +32,10 @@ def cash_by_fund(external_account_id: int, currency: str = "KES") -> dict[int, M
 
 def entry_fund(entry_id: int) -> int:
     """The fund whose books a journal entry is in."""
-    return JournalEntry.objects.values_list("fund_id", flat=True).get(pk=entry_id)
+    fund_id = JournalEntry.objects.filter(pk=entry_id).values_list("fund_id", flat=True).first()
+    if fund_id is None:  # unknown, or another tenant's (row-level security hides it)
+        raise LedgerError(f"Unknown journal entry {entry_id}.")
+    return fund_id
 
 
 def entry_funds(entry_ids) -> dict[int, int]:
@@ -71,19 +75,23 @@ def fund_holds_nothing(fund_id: int) -> bool:
                 .annotate(v=_SIGNED).exclude(v=0).exists())
 
 
-def trial_balance(fund_id: int | None = None) -> Decimal:
-    """Total debits minus total credits: zero whenever the ledger is sound."""
-    qs = JournalLine.objects.all() if fund_id is None else JournalLine.objects.filter(account__fund_id=fund_id)
+def trial_balance(fund_id: int | None = None, currency: str = "KES") -> Decimal:
+    """Total debits minus total credits in one currency: zero whenever the
+    ledger is sound. Never summed across currencies, where a surplus in one
+    could hide a shortfall in another."""
+    qs = JournalLine.objects.filter(account__currency=currency)
+    qs = qs if fund_id is None else qs.filter(account__fund_id=fund_id)
     agg = qs.aggregate(
         d=Sum(Case(When(side=Side.DEBIT.value, then=F("amount")), default=Value(0), output_field=_DEC)),
         c=Sum(Case(When(side=Side.CREDIT.value, then=F("amount")), default=Value(0), output_field=_DEC)))
     return (agg["d"] or Decimal(0)) - (agg["c"] or Decimal(0))
 
 
-def member_movements(fund_id: int, member_id: int) -> list[dict]:
-    """One member's movements in a fund, oldest first, with a running balance."""
+def member_movements(fund_id: int, member_id: int, currency: str = "KES") -> list[dict]:
+    """One member's movements in a fund and currency, in posting order (entry
+    id, which follows insertion), with a running balance."""
     rows = (JournalLine.objects.filter(account__fund_id=fund_id, account__purpose=AccountPurpose.MEMBER_INTEREST,
-                                       account__member_id=member_id)
+                                       account__member_id=member_id, account__currency=currency)
             .select_related("entry", "account").order_by("entry_id", "id"))
     running, out = Decimal("0.00"), []
     for r in rows:

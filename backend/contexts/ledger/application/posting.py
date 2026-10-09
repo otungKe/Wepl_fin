@@ -12,6 +12,7 @@ from ..infrastructure.models import JournalEntry, JournalLine
 
 KEY_UNIQUE = "ledger_entry_key_unique"
 REVERSED_ONCE = "ledger_journalentry_reverses_id_key"
+TRANSFER_LEG_ONCE = "ledger_transfer_leg_once"
 
 
 def post_journal(draft: JournalDraft) -> int:
@@ -45,13 +46,21 @@ def _post(draft: JournalDraft) -> int:
                 JournalLine(entry=entry, account=accounts.resolve(p.account), side=p.side.value,
                             amount=p.amount.amount) for p in draft.postings)
     except IntegrityError as exc:
-        # Only the two races the database settles are translated; any other
+        # Only the races the database settles are translated; any other
         # failure (a trigger, a foreign key, a check) is a real error.
         violated = getattr(getattr(exc.__cause__, "diag", None), "constraint_name", None)
-        if violated == KEY_UNIQUE:  # lost a race on the same key
-            return _replay(JournalEntry.objects.get(idempotency_key=draft.idempotency_key), draft)
-        if violated == REVERSED_ONCE:  # lost a race to reverse the same entry
+        if violated not in (KEY_UNIQUE, REVERSED_ONCE, TRANSFER_LEG_ONCE):
+            raise
+        # Lost a race. If the winner used this key, this is its retry, whichever
+        # unique index PostgreSQL happened to check first.
+        winner = JournalEntry.objects.filter(idempotency_key=draft.idempotency_key).first()
+        if winner:
+            return _replay(winner, draft)
+        if violated == REVERSED_ONCE:
             raise LedgerError(f"Entry {draft.reverses_entry_id} has already been reversed.") from None
+        if violated == TRANSFER_LEG_ONCE:
+            raise LedgerError(f"Fund transfer {draft.cause_type}:{draft.cause_id} has already been posted "
+                              "under another key.") from None
         raise
     return entry.pk
 
