@@ -18,6 +18,7 @@ from contexts.ledger.tests.integration.test_database_rules import Book, accounts
 from contexts.notifications.public import topics_since
 from contexts.shared_kernel.money import Money
 from contexts.tenancy.public import cross_tenant, tenant
+from tests.database_roles import AsSchemaOwner
 
 BROKEN = FundPosition(cash=Money("100"), member_interests=Money("90"), unattributed=Money("0"),
                       retained=Money("0"), unexplained_out=Money("0"))  # a query bug the check must notice
@@ -26,9 +27,9 @@ BROKEN = FundPosition(cash=Money("100"), member_interests=Money("90"), unattribu
 @contextmanager
 def balance_rules_off():
     """Turn off 0002's commit-time balance checks, as a superuser, a restore
-    or a dropped trigger would. The application role can do this only
-    because it owns the tables (review 2026-10-06, H1); the test's rollback
-    turns them back on, and so does the end of this block."""
+    or a dropped trigger would. Only the schema owner can (ADR-0027), so the
+    test case must be ``AsSchemaOwner``. The test's rollback turns them back
+    on, and so does the end of this block."""
     rules = (("ledger_journalline", "ledger_line_balanced"), ("ledger_journalentry", "ledger_entry_has_lines"))
     with connection.cursor() as c:
         c.execute("SET CONSTRAINTS ALL IMMEDIATE")  # ALTER TABLE refuses while trigger events are pending
@@ -110,8 +111,8 @@ class IntegrityCheckTests(TestCase):
     def test_results_are_append_only_and_cannot_claim_a_pass_they_did_not_get(self):
         self.enterContext(self.in_a())
         [c] = check_books()
-        with self.assertRaisesMessage(DatabaseError, "append-only"), transaction.atomic():
-            IntegrityCheck.objects.filter(pk=c.pk).update(passed=False)
+        with self.assertRaisesMessage(DatabaseError, "permission denied"), transaction.atomic():
+            IntegrityCheck.objects.filter(pk=c.pk).update(passed=False)  # the trigger too: tests/test_database_roles.py
         with self.assertRaises(DatabaseError), transaction.atomic():
             IntegrityCheck.objects.create(fund_id=c.fund_id, currency="KES", trial_balance=Decimal("5"), cash=0,
                                           member_interests=0, unattributed=0, retained=0, unexplained_out=0,
@@ -128,9 +129,10 @@ class IntegrityCheckTests(TestCase):
                 call_command("check_ledger_integrity", stdout=mock.MagicMock(), stderr=mock.MagicMock())
 
 
-class BypassedRulesTests(TestCase):
+class BypassedRulesTests(AsSchemaOwner):
     """Books that PostgreSQL would have refused, written with its checks
-    turned off: the nightly check must fail them, which is its whole job."""
+    turned off as the schema owner: the nightly check must fail them, which
+    is its whole job."""
 
     def setUp(self):
         self.a = Book("A")

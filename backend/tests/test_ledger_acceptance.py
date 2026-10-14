@@ -1,6 +1,7 @@
 """ADR-0003 acceptance: the checks Harry listed (2026-10-02) that no earlier
 test covered directly. Each test names its checklist item. Every write here
-runs as the application role, wepl_app, which row-level security binds."""
+runs as the application role, wepl_app, which row-level security binds, except
+in SecondCurrencyTests, which only the schema owner can set up (ADR-0027)."""
 from decimal import Decimal
 
 from django.db import DatabaseError, connection, transaction
@@ -12,9 +13,11 @@ from contexts.ledger.contract import AccountKey, AccountPurpose, JournalDraft, S
 from contexts.ledger.infrastructure.models import Account, JournalEntry
 from contexts.ledger.public import (account_balance, fund_position, member_balances, post_journal, reverse_journal,
                                     trial_balance)
+from contexts.ledger.tests.integration.test_database_rules import accounts_in_any_currency
 from contexts.shared_kernel.money import Money
 from contexts.tenancy.public import cross_tenant
 from simulators.custodian_bank import bank
+from tests.database_roles import AsSchemaOwner
 from tests.scenario import Scenario
 
 D, C = Side.DEBIT, Side.CREDIT
@@ -32,7 +35,9 @@ def check_deferred():
         c.execute("SET CONSTRAINTS ALL DEFERRED")
 
 
-class LedgerAcceptanceTests(TestCase):
+class AcceptanceBooks(TestCase):
+    """The set-up and helpers every acceptance test uses."""
+
     def setUp(self):
         self.s = Scenario("Acceptance", account="ACC1")
         self.enterContext(self.s.acting())
@@ -61,6 +66,8 @@ class LedgerAcceptanceTests(TestCase):
             write()
             check_deferred()
 
+
+class LedgerAcceptanceTests(AcceptanceBooks):
     # Balanced posting --------------------------------------------------------
 
     def test_a_balanced_journal_of_many_lines_commits(self):
@@ -69,28 +76,6 @@ class LedgerAcceptanceTests(TestCase):
         check_deferred()  # the commit-time balance check passes
         self.assertEqual(JournalEntry.objects.get(pk=entry).lines.count(), 4)
         self.assertEqual(trial_balance(self.f), 0)
-
-    def test_currencies_never_balance_each_other(self):
-        """Ten KES of debit cannot be balanced by ten USD of credit, in the
-        database as in the domain."""
-        self.post("seed", [(self.cash, D, Money("1")), (self.retained, C, Money("1"))])
-        kes = Account.objects.get(purpose="custody_cash")
-        from contexts.ledger.tests.integration.test_database_rules import accounts_in_any_currency
-        with accounts_in_any_currency():  # funds are KES only; the balance rule must still hold if one got in
-            usd = Account.objects.create(purpose="retained", group_id=self.g, fund_id=self.f, currency="USD",
-                                         normal_side="C")
-
-        def kes_against_usd():
-            e = self.raw_entry("fx")
-            self.raw_line(e, kes.pk, "D", 10)
-            self.raw_line(e, usd.pk, "C", 10)
-        self.refused("does not balance", kes_against_usd)
-        from contexts.ledger.contract import LedgerError, Posting
-        usd_key = AccountKey(self.g, self.f, AccountPurpose.RETAINED, currency="USD")
-        with self.assertRaisesMessage(LedgerError, "does not balance"):
-            JournalDraft(idempotency_key="fx", group_id=self.g, fund_id=self.f, kind="t", cause_type="t",
-                         cause_id="1", postings=(Posting(self.cash, D, Money("10")),
-                                                 Posting(usd_key, C, Money("10", "USD"))))
 
     # Empty and malformed entries --------------------------------------------
 
@@ -108,16 +93,19 @@ class LedgerAcceptanceTests(TestCase):
     # Immutable history -------------------------------------------------------
 
     def test_history_refuses_update_and_delete_as_the_application_role(self):
-        """TRUNCATE is proven in tests/test_ledger_committed.py: PostgreSQL
-        refuses to truncate a table with pending deferred checks, so it must
-        run in a transaction of its own, after a real commit."""
+        """The application's role is not granted UPDATE or DELETE on them
+        (ADR-0027); tests/test_database_roles.py proves the append-only
+        trigger behind the privilege. TRUNCATE is proven in
+        tests/test_ledger_committed.py: PostgreSQL refuses to truncate a table
+        with pending deferred checks, so it must run in a transaction of its
+        own, after a real commit."""
         role = sql("SELECT current_user, rolsuper, rolbypassrls FROM pg_roles WHERE rolname = current_user")[0]
         self.assertEqual(role, ("wepl_app", False, False))
         self.post("kept", [(self.cash, D, Money("5")), (self.retained, C, Money("5"))])
         for table in ("ledger_account", "ledger_journalentry", "ledger_journalline"):
             for statement in (f"UPDATE {table} SET id = id", f"DELETE FROM {table}"):
                 with self.subTest(statement):
-                    self.refused("append-only", lambda: sql(statement))
+                    self.refused("permission denied", lambda: sql(statement))
         self.assertEqual(JournalEntry.objects.filter(idempotency_key="kept").count(), 1)
 
     # Balance and reconciliation ---------------------------------------------
@@ -170,6 +158,31 @@ class LedgerAcceptanceTests(TestCase):
             self.raw_line(e, w_ret, "C", 5)
         self.refused("group and fund", cross_fund)
 
+
+class SecondCurrencyTests(AsSchemaOwner, AcceptanceBooks):
+    """Funds are KES only, so only the schema owner, turning communities 0020
+    off, can put a second currency in a fund (ADR-0027)."""
+
+    def test_currencies_never_balance_each_other(self):
+        """Ten KES of debit cannot be balanced by ten USD of credit, in the
+        database as in the domain."""
+        self.post("seed", [(self.cash, D, Money("1")), (self.retained, C, Money("1"))])
+        kes = Account.objects.get(purpose="custody_cash")
+        with accounts_in_any_currency():  # funds are KES only; the balance rule must still hold if one got in
+            usd = Account.objects.create(purpose="retained", group_id=self.g, fund_id=self.f, currency="USD",
+                                         normal_side="C")
+
+        def kes_against_usd():
+            e = self.raw_entry("fx")
+            self.raw_line(e, kes.pk, "D", 10)
+            self.raw_line(e, usd.pk, "C", 10)
+        self.refused("does not balance", kes_against_usd)
+        from contexts.ledger.contract import LedgerError, Posting
+        usd_key = AccountKey(self.g, self.f, AccountPurpose.RETAINED, currency="USD")
+        with self.assertRaisesMessage(LedgerError, "does not balance"):
+            JournalDraft(idempotency_key="fx", group_id=self.g, fund_id=self.f, kind="t", cause_type="t",
+                         cause_id="1", postings=(Posting(self.cash, D, Money("10")),
+                                                 Posting(usd_key, C, Money("10", "USD"))))
 
 
 class CrossTenantSqlTests(TestCase):

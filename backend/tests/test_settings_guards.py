@@ -11,7 +11,7 @@ BOOT = "import django; django.setup()"
 
 
 def boot(**env):
-    base = {k: v for k, v in os.environ.items() if not k.startswith(("DJANGO_", "WEPL_"))}
+    base = {k: v for k, v in os.environ.items() if not k.startswith(("DJANGO_", "WEPL_", "DB_OWNER_"))}
     base["DJANGO_SETTINGS_MODULE"] = "config.settings"
     return subprocess.run([sys.executable, "-c", BOOT], cwd=BACKEND, env=base | env, capture_output=True, text=True)
 
@@ -33,6 +33,13 @@ class BootGuardTests(TestCase):
         result = boot(DJANGO_DEBUG="0", DJANGO_SECRET_KEY="a-real-secret", WEPL_ENABLE_SIMULATOR="0")
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("WEPL_OPERATOR_KEY must be set", result.stderr)
+
+    def test_production_never_holds_the_schema_owners_login(self):
+        """ADR-0027: the owner's login is for tests; deploy runs migrate with it, apart."""
+        result = boot(DJANGO_DEBUG="0", DJANGO_SECRET_KEY="a-real-secret", WEPL_ENABLE_SIMULATOR="0",
+                      WEPL_OPERATOR_KEY="kTn6hqEYgtqMm1D0bc7k2bXbK1o3e9mLqvH4CUtdUfI=", DB_OWNER_USER="wepl_owner")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("DB_OWNER_USER is for tests only", result.stderr)
 
     def test_a_correct_production_configuration_boots(self):
         result = boot(DJANGO_DEBUG="0", DJANGO_SECRET_KEY="a-real-secret", WEPL_ENABLE_SIMULATOR="0",

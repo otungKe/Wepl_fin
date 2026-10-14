@@ -119,8 +119,8 @@ class ProposalTests(TestCase):
         decide(self.propose().id, self.chair.id, approve=True)
         self.assertEqual(adopt_constitution(self.group.id, RULES, actor="t"), 2)
         for action in (lambda: Constitution.objects.update(rules={}), lambda: Approval.objects.all().delete()):
-            with self.assertRaisesMessage(DatabaseError, "append-only"):
-                with transaction.atomic():
+            with self.assertRaisesMessage(DatabaseError, "permission denied"):  # and the trigger behind it:
+                with transaction.atomic():                                      # tests/test_database_roles.py
                     action()
 
     def test_a_constitution_must_state_each_of_the_groups_choices(self):

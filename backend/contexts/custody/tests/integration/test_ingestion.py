@@ -154,8 +154,8 @@ class WithdrawalTests(TestCase):
 
     def test_statement_history_is_append_only(self):
         for action in (lambda: StatementLine.objects.update(amount=1), lambda: LineResolution.objects.all().delete()):
-            with self.assertRaisesMessage(DatabaseError, "append-only"):
-                with transaction.atomic():
+            with self.assertRaisesMessage(DatabaseError, "permission denied"):  # and the trigger behind it:
+                with transaction.atomic():                                      # tests/test_database_roles.py
                     action()
 
 

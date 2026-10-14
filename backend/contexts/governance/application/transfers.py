@@ -144,7 +144,7 @@ def propose_fund_transfer(proposer_id: int, from_fund_id: int, to_fund_id: int, 
 def decide_fund_transfer(transfer_id: int, voter_id: int, *, approve: bool, source: str = "app") -> FundTransferView:
     """One member's decision. Repeating it is a no-op; changing it is refused.
     Once approved, custody books it (``custody.public.book_fund_transfer``)."""
-    t = FundTransfer.objects.select_for_update().select_related("constitution").get(pk=transfer_id)
+    t = FundTransfer.objects.select_for_update(of=("self",)).select_related("constitution").get(pk=transfer_id)
     voter = membership(voter_id)
     previous = TransferVote.objects.filter(transfer=t, membership_id=voter.id).first()
     if previous is not None:

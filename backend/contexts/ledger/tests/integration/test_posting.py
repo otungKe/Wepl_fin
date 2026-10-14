@@ -9,6 +9,7 @@ from contexts.ledger.public import (account_balance, fund_position, member_balan
                                     trial_balance)
 from contexts.shared_kernel.money import Money
 from contexts.tenancy.public import cross_tenant, tenant
+from tests.database_roles import AsSchemaOwner
 
 D, C = Side.DEBIT, Side.CREDIT
 
@@ -165,6 +166,23 @@ class PostingTests(RealBooks, TestCase):
         self.assertEqual(trial_balance(self.fund_id), 0)
         self.assertTrue(fund_position(self.fund_id).invariant_holds)
 
+    def test_balances_are_recomputed_from_lines_alone(self):
+        """No balance is stored: each query re-derives it, so it always equals
+        the signed sum of the lines."""
+        for n in range(5):
+            post_journal(self.draft(f"b{n}", f"{10 * (n + 1)}"))
+        reverse_journal(JournalEntry.objects.get(idempotency_key="b2").pk, idempotency_key="b2:rev")
+        signed = sum(l.amount if l.side == "C" else -l.amount
+                     for l in JournalLine.objects.filter(account__purpose="member_interest"))
+        self.assertEqual(member_balances(self.fund_id)[self.member_id].amount, signed)
+        self.assertEqual(member_balances(self.fund_id)[self.member_id], Money("120"))
+        self.assertEqual(trial_balance(), 0)
+
+
+class SecondCurrencyTests(RealBooks, AsSchemaOwner):
+    """As the schema owner, the only role that can turn communities 0020 off
+    (ADR-0027)."""
+
     def test_a_members_movements_and_the_trial_balance_stay_in_one_currency(self):
         """Should a second currency ever reach a fund's books (today only a
         restore could put one there: communities 0020), no query may add
@@ -183,18 +201,6 @@ class PostingTests(RealBooks, TestCase):
         self.assertEqual([r["balance"] for r in member_movements(self.fund_id, self.member_id, "USD")],
                          [Money("7", "USD").amount])
         self.assertEqual((trial_balance(self.fund_id), trial_balance(self.fund_id, "USD")), (0, 0))
-
-    def test_balances_are_recomputed_from_lines_alone(self):
-        """No balance is stored: each query re-derives it, so it always equals
-        the signed sum of the lines."""
-        for n in range(5):
-            post_journal(self.draft(f"b{n}", f"{10 * (n + 1)}"))
-        reverse_journal(JournalEntry.objects.get(idempotency_key="b2").pk, idempotency_key="b2:rev")
-        signed = sum(l.amount if l.side == "C" else -l.amount
-                     for l in JournalLine.objects.filter(account__purpose="member_interest"))
-        self.assertEqual(member_balances(self.fund_id)[self.member_id].amount, signed)
-        self.assertEqual(member_balances(self.fund_id)[self.member_id], Money("120"))
-        self.assertEqual(trial_balance(), 0)
 
 
 class TenantBoundaryTests(TestCase):
@@ -264,6 +270,6 @@ class DatabaseRuleTests(RealBooks, TestCase):
                        lambda: JournalLine.objects.filter(pk=line.pk).delete(),
                        lambda: JournalEntry.objects.filter(pk=self.entry.pk).update(memo="edited"),
                        lambda: Account.objects.filter(pk=self.cash.pk).update(currency="USD")):
-            with self.assertRaisesMessage(DatabaseError, "append-only"):
-                with transaction.atomic():
+            with self.assertRaisesMessage(DatabaseError, "permission denied"):  # and the trigger behind it:
+                with transaction.atomic():                                      # tests/test_database_roles.py
                     action()

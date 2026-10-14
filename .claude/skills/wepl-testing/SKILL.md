@@ -26,6 +26,17 @@ Postgres-only; never use sqlite. **Connect as `wepl_app`, never as
 would pass for the wrong reason; `tests/test_tenancy.py` fails first if you
 try.
 
+**Two logins (ADR-0027).** Set `DB_OWNER_USER`/`DB_OWNER_PASSWORD` too: the
+runner (`tests/database_roles.py`) creates and migrates the test database as
+`wepl_owner`, then runs every test as `wepl_app`, which owns nothing.
+- The app role is refused `UPDATE`/`DELETE` on history with "permission
+  denied" before any trigger runs. Assert that for the app;
+  `tests/test_database_roles.py` proves the triggers behind it, as the owner.
+- A test that turns a rule off (`balance_rules_off`,
+  `accounts_in_any_currency`) or runs migration SQL subclasses
+  `AsSchemaOwner`: the whole class connects as the owner, which forced
+  row-level security still binds. Keep such classes small.
+
 ## Where tests go (guideline 29)
 
 | Kind | Place | Base class |

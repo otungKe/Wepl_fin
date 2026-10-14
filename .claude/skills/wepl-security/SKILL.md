@@ -48,10 +48,11 @@ yet.
 | **Tenant isolation by forced PostgreSQL row-level security**; fails closed without a context; cross-tenant access declared and audited | `contexts/tenancy`, `persistence/tenancy.py` (ADR-0009) | `tests/test_tenancy.py` |
 | **A person is changed only by an audited, declared cross-tenant correction** (`correct_person`, with a reason); registering never renames anyone, and a number already held by another person is refused | `contexts/identity` | `identity/tests/integration/test_people.py` |
 | **The app's database role cannot bypass RLS** | `tenancy.E001` system check | `tests/test_tenancy.py` |
+| **The app's database role owns nothing** and cannot turn a trigger, policy or forced RLS off, edit append-only history or delete any row; only `wepl_owner` migrates | grants in tenancy 0003, `scripts/database_roles.sql`, `tenancy.E002` (ADR-0027) | `tests/test_database_roles.py` |
 | **A row only ever refers to rows of its own tenant**, for any role in any mode (foreign keys ignore RLS, so the tenant is part of every key) | composite keys and plain-id checks (ADR-0017) | `tests/test_linked_rows.py` |
-| Financial and audit history cannot be edited or deleted, even with SQL | PostgreSQL triggers (ADR-0003) | ledger, custody and audit tests |
+| Financial and audit history cannot be edited or deleted, even with SQL | missing privilege, then PostgreSQL triggers that hold even for the owner (ADR-0003, ADR-0027) | ledger, custody and audit tests; `tests/test_database_roles.py` |
 | Every business action has an audit record with an operation id | `audit.public.record` / `operation` | throughout |
-| **Refuse to boot** with DEBUG off and the dev secret, or with DEBUG off and the simulated bank | `config/settings.py` | `tests/test_settings_guards.py` |
+| **Refuse to boot** with DEBUG off and the dev secret, or with DEBUG off and the simulated bank, or with DEBUG off and the schema owner's login configured | `config/settings.py` | `tests/test_settings_guards.py` |
 | **Logs carry no phone numbers or names** | `notifications/domain/redaction.py` | `notifications/tests/unit/test_redaction.py` |
 | **Operators sign in** with a provisioned account: password, then an authenticator code (RFC 6238, each code once); staged sessions reach nothing until finished; 30-minute idle and 12-hour limits; five failures lock for 15 minutes and end open sessions; identical answers for unknown email, wrong password and locked | `contexts/operators` (ADR-0021) | `operators/tests/` |
 | **Operator capabilities fail closed**, by role in code; sensitive ones need a code from the last 10 minutes | `operators/domain/capabilities.py` | same |

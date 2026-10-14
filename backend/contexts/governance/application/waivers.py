@@ -91,7 +91,7 @@ def propose_waiver(proposer_id: int, fund_id: int, member_id: int, *, owed: str,
 @transaction.atomic  # the waiver row lock serialises votes
 def decide_waiver(waiver_id: int, voter_id: int, *, approve: bool, source: str = "app") -> WaiverView:
     """One member's decision. Repeating it is a no-op; changing it is refused."""
-    w = Waiver.objects.select_for_update().select_related("constitution").get(pk=waiver_id)
+    w = Waiver.objects.select_for_update(of=("self",)).select_related("constitution").get(pk=waiver_id)
     voter = membership(voter_id)
     previous = WaiverVote.objects.filter(waiver=w, membership_id=voter.id).first()
     if previous is not None:

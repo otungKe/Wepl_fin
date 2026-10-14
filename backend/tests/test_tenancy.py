@@ -20,6 +20,7 @@ from contexts.tenancy.infrastructure.session import database_tenant, role_bypass
 from persistence.tenancy import revalidate_foreign_keys, same_tenant
 from contexts.tenancy.public import TenancyError, cross_tenant, current_tenant, provision_tenant, tenant
 from simulators.custodian_bank import bank
+from tests.database_roles import AsSchemaOwner
 from tests.scenario import SIGNATORY, Scenario
 
 OURS = {"audit", "tenancy", "identity", "communities", "governance", "ledger", "custody", "notifications", "simulator",
@@ -73,7 +74,8 @@ class RlsIsolationTests(TestCase):
             self.assertEqual(sql("SELECT count(*) FROM custody_statementline WHERE id = %s", [b_line])[0][0], 0)
             self.assertEqual(sql("UPDATE governance_mandate SET status = 'expired' WHERE reference = %s",
                                  [self.b_ref]), 0)
-            self.assertEqual(sql("DELETE FROM notifications_outboxevent WHERE tenant_id = %s", [self.b.tenant_id]), 0)
+            with self.assertRaisesMessage(DatabaseError, "permission denied"), transaction.atomic():
+                sql("DELETE FROM notifications_outboxevent WHERE tenant_id = %s", [self.b.tenant_id])  # ADR-0027
         with self.b.acting():
             self.assertEqual(Mandate.objects.get(reference=self.b_ref).status, "issued")
 
@@ -222,10 +224,11 @@ class EveryTenantKeyIsReachableUnderRlsTests(TestCase):
         self.assertEqual(missing, [])
 
 
-class ForeignKeysSeeEveryTenantTests(TestCase):
+class ForeignKeysSeeEveryTenantTests(AsSchemaOwner):
     """Adding a foreign key checks the rows already there, but under forced
     row-level security PostgreSQL's check sees only what the policy shows.
-    Found by the restore drill (2026-10-04)."""
+    Found by the restore drill (2026-10-04). Migration SQL, so it runs as the
+    schema owner, which forced row-level security binds too (ADR-0027)."""
 
     def setUp(self):
         self.a, self.b = Scenario("A"), Scenario("B", account="0012345678902")

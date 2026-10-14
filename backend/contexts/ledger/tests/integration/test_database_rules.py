@@ -29,7 +29,8 @@ def accounts_in_any_currency():
     """Turn off communities 0020 (an account is in its fund's currency) for
     the block, as a restore or the schema owner could, so a test can make
     a second currency's account and prove the ledger still keeps the two
-    apart. Funds are KES only, so nothing else can make one."""
+    apart. Funds are KES only, so nothing else can make one. Only the schema
+    owner can (ADR-0027), so the test case must be ``AsSchemaOwner``."""
     with connection.cursor() as c:
         c.execute("SET CONSTRAINTS ALL IMMEDIATE")  # ALTER TABLE refuses while trigger events are pending
         c.execute("SET CONSTRAINTS ALL DEFERRED")

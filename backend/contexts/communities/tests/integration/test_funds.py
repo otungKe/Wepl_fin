@@ -175,7 +175,7 @@ class LifecycleTests(TestCase):
 
     def test_funds_are_never_deleted(self):
         for fund in (self.fund, close_fund(open_fund(self.group.id, name="Old", actor="t").id, actor="t")):
-            with self.subTest(fund.status), self.assertRaisesMessage(DatabaseError, "never deleted"), \
+            with self.subTest(fund.status), self.assertRaisesMessage(DatabaseError, "permission denied"), \
                     transaction.atomic():
                 Fund.objects.filter(pk=fund.id).delete()
 
@@ -230,7 +230,7 @@ class ClosedFundsAndCodesTests(TestCase):
         self.assertEqual(sorted(FundCode.objects.filter(group_id=self.group.id).values_list("code", "fund_id")),
                          [("WEL", self.fund.id), ("WLF", self.fund.id)])
         for change in (lambda q: q.update(fund_id=other.id), lambda q: q.delete()):
-            with self.subTest(change), self.assertRaisesMessage(DatabaseError, "stays its fund's"), \
+            with self.subTest(change), self.assertRaisesMessage(DatabaseError, "permission denied"), \
                     transaction.atomic():
                 change(FundCode.objects.filter(code="WEL"))
 

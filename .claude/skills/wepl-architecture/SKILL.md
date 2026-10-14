@@ -152,6 +152,16 @@ explicit tenant context → application checks → PostgreSQL RLS (forced) → d
   from `NEW.tenant_id` inside it, as the ledger's balance check does.
 - **Connect as `wepl_app`.** It is not a superuser and has no BYPASSRLS, or
   RLS silently does nothing. The `tenancy.E001` check and a test enforce it.
+- **The application owns nothing (ADR-0027).** `wepl_owner` owns the schema
+  and runs `migrate`; `wepl_app` gets its privileges through `wepl_runtime`:
+  `SELECT, INSERT`, `UPDATE` only where state changes, never `DELETE`. New
+  tables get that by default privileges; `append_only()` takes `UPDATE` back.
+  So:
+  - no code deletes a row, and none locks an append-only row `FOR UPDATE`
+    (PostgreSQL needs `UPDATE` for that). Use `select_for_update(of=("self",))`
+    with `select_related`, or an advisory lock (governance `infrastructure/locks.py`);
+  - a hand-written append-only trigger names its function `<table>_append_only`,
+    which is how the grants and `tenancy.E002` find it.
 - **Group checks stay.** Commands still verify that member, fund, mandate and
   line belong to one group. They are defence in depth, and they are tested
   with RLS deliberately widened (`tests/test_isolation.py`).

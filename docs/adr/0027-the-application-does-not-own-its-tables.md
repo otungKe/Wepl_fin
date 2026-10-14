@@ -1,8 +1,15 @@
 # ADR-0027: The application does not own its tables
 
-- **Status:** **Proposed** (Claude, 2026-10-09). Harry asked for it
-  ("proceed", 2026-10-09) after the ledger hardening review's finding H1
-  (`docs/architecture/review-ledger-hardening.md`).
+- **Status:** **Accepted** (Harry, 2026-10-09), steps 1–6 built. Drafted by
+  Claude after the ledger hardening review's finding H1
+  (`docs/architecture/review-ledger-hardening.md`). Harry's terms:
+  - WEPL operations holds the owner's credentials, apart from the
+    application servers;
+  - the role split is one focused change;
+  - the seal (step 7) is a separate follow-up, unless its severity requires
+    it before the role split is deployed (see "The seal after the split");
+  - accepted subject to verifying the actual privileges and the seal, which
+    "Verified" below records.
 - **Touches:** ADR-0003 (append-only ledger), ADR-0009 (row-level security),
   ADR-0017 (linked rows keep their tenant), ADR-0020 (nightly run and restore
   drill), and every context's migrations.
@@ -60,13 +67,19 @@ ADR-0009 already makes sure the role is not a superuser and has no BYPASSRLS
      independent locks, and the trigger still gives the clear error message.
 3. **Every table is classified, or the build fails.** `persistence/postgres.append_only()`
    also emits the `REVOKE UPDATE` for its table. Default privileges
-   (`ALTER DEFAULT PRIVILEGES FOR ROLE wepl_owner`) give a new table
+   (`ALTER DEFAULT PRIVILEGES`, run by `wepl_owner`) give a new table
    `SELECT, INSERT, UPDATE`, so a forgotten append-only table fails safe on
-   its trigger, not open. An architecture test checks that every table
-   declaring `append_only` has no `UPDATE` grant.
+   its trigger, not open. An append-only table is any table with a trigger
+   whose function is named `<table>_append_only` (the helper's, or a
+   hand-written one such as `communities_fundcode`'s). The boot check below
+   finds any of them with an `UPDATE` grant, and the suite runs it.
 4. **A boot check, `tenancy.E002`.** It refuses to start if the connected
-   role owns any table in the schema, or can `UPDATE` an append-only one.
-   This sits beside `E001` (superuser or BYPASSRLS).
+   role owns any table, sequence or function in the schema (directly or by
+   membership), can `UPDATE` an append-only table, holds `DELETE`,
+   `TRUNCATE`, `REFERENCES` or `TRIGGER` on any table, or can `CREATE` in the
+   schema. This sits beside `E001` (superuser or BYPASSRLS). The schema owner
+   is recognised by name (`WEPL_SCHEMA_OWNER`, default `wepl_owner`) and gets
+   only a warning, `tenancy.W001`, so `migrate` can run as it.
 5. **A test as the runtime role.** It shows each of these is refused:
    - `ALTER TABLE … DISABLE TRIGGER`;
    - `DROP POLICY`;
@@ -74,13 +87,19 @@ ADR-0009 already makes sure the role is not a superuser and has no BYPASSRLS
    - `UPDATE`, `DELETE` and `TRUNCATE` on the ledger's tables;
    - `CREATE TRIGGER`.
 
-   The suite runs as `wepl_app` in CI. A second database alias,
-   `migrations`, connects as `wepl_owner` to create and migrate the test
-   database.
-6. **Bypass tests act as the owner.** The ledger tests that turn the balance
-   triggers off (to prove the nightly check catches what they would have
-   refused) run their `ALTER TABLE` on the `migrations` connection. That is
-   honest: only the schema owner, a superuser or a restore can do that.
+   The suite runs as `wepl_app` in CI. The test runner
+   (`tests/database_roles.py`) creates and migrates the test database as
+   `wepl_owner`, whose login is configured for tests only (`DB_OWNER_USER`;
+   with `DEBUG` off the settings refuse it). Another test proves, as the
+   owner, that every append-only trigger still refuses `UPDATE`, `DELETE`
+   and `TRUNCATE`: the second lock.
+6. **Bypass tests act as the owner.** The tests that turn a rule off (to
+   prove the nightly check catches what the balance triggers would have
+   refused, or that a second currency stays apart) and the tests of
+   migration SQL subclass `AsSchemaOwner`: the whole test case connects as
+   `wepl_owner`. That is honest: only the schema owner, a superuser or a
+   restore can do that. (A second connection cannot do it inside a test's
+   transaction: `ALTER TABLE` waits for the locks that transaction holds.)
 7. **The seal stops relying on a setting.** Once the runtime role can no
    longer drop the trigger, the remaining forgery is the session setting.
    The line trigger then decides "is this entry still open?" from the entry
@@ -96,6 +115,42 @@ ADR-0009 already makes sure the role is not a superuser and has no BYPASSRLS
    - **The README** documents the two roles and what each may do.
    - **Deployment** runs `migrate` with the owner's credentials, held apart
      from the application's.
+
+## Verified (2026-10-09)
+
+- **Before** (CONFIRMED, local database at main `b3d2dad`): `wepl_app` owned
+  all 40 tables and 49 functions in the schema.
+- **After** (CONFIRMED, `tests/test_database_roles.py`): `wepl_app` owns
+  nothing. It is refused, for want of privilege, `DISABLE TRIGGER`,
+  `DROP TRIGGER`, `DROP POLICY`, `NO FORCE ROW LEVEL SECURITY`,
+  `DROP CONSTRAINT`, `CREATE TRIGGER`, replacing a policy function,
+  `CREATE TABLE` and `SET ROLE wepl_owner`; `UPDATE`, `DELETE` and
+  `TRUNCATE` on all 15 append-only tables; and `DELETE` on every table.
+- **Two code changes** the missing privileges required, because
+  PostgreSQL needs `UPDATE` to lock a row:
+  - adopting a constitution locked its latest version `FOR UPDATE`; it now
+    takes a transaction-scoped advisory lock per group
+    (`governance/infrastructure/locks.py`), with a race test;
+  - deciding a proposal, transfer or waiver locked its constitution too,
+    through `select_related`; it now locks only its own row (`of=("self",)`).
+- **The restore drill** compares each table's owner and grants, and the
+  default privileges, and runs `tenancy.E002` on the copy.
+
+### The seal after the split
+
+CONFIRMED (2026-10-09, as `wepl_app` after the split, rolled back): setting
+`wepl.ledger_open_entries` to an old entry's id and inserting a balanced
+pair of lines on two members' accounts was accepted, and the balance checks
+passed. So with the application's credentials one can still move money
+between members inside an entry posted earlier.
+
+Severity: Medium, not a blocker for the split. The split already took away
+editing, deleting and turning rules off. What remains needs only `INSERT`,
+which the application must keep; the same person could post a new entry
+just as well. What the forged seal adds is concealment: the change sits
+inside an old, approved entry instead of appearing as a new one. Nothing
+runs in production yet. Step 7 should land before the pilot handles real
+money, as the next ledger change.
 
 ## Alternatives considered
 
@@ -122,22 +177,21 @@ ADR-0009 already makes sure the role is not a superuser and has no BYPASSRLS
 - Every new table needs its history rule declared (decision 3). This matches
   how each table already declares its tenant scope.
 - The test setup gains one database alias, and the bypass tests use it.
-- No data changes. The migration that applies the grants reassigns
-  ownership (`REASSIGN OWNED BY wepl_app TO wepl_owner`) and revokes what the
-  runtime role should not have. It is reversible by the database
-  administrator.
+- No data changes. `scripts/database_roles.sql` (run by the database
+  administrator) creates the roles and hands an existing database to the
+  owner (`REASSIGN OWNED BY wepl_app TO wepl_owner`); tenancy migration 0003
+  then grants the runtime role its share. Both are reversible by the
+  database administrator.
 - `app.cross_tenant` and `app.tenant_id` are still session settings the
   application sets. That is by design (ADR-0009): RLS binds the application
   to its declared context, and a forged context is visible in the audit only
   if declared. ADR-0009's alternative (a separate BYPASSRLS role for system
   jobs) stays a later option, as that ADR says.
 
-## Open questions for Harry
+## Answered
 
-1. **Hosting.** Where will production PostgreSQL run: a managed service or
-   the bank's own servers? Both support separate roles, but the bank may
-   have its own rules for who holds the owner credentials. ASSUMPTION: WEPL
-   operations hold them, kept apart from the application servers.
-2. **Order of work.** I recommend steps 1–6 as one change (roles, grants,
-   boot check, tests, CI, restore drill), then step 7 (the seal) as a small
-   ledger follow-up.
+1. **Credentials.** WEPL operations holds the owner's credentials, apart
+   from the application servers (Harry, 2026-10-09). Where production
+   PostgreSQL runs is still open; both options support separate roles.
+2. **Order of work.** Steps 1–6 as one change, step 7 as a follow-up
+   (Harry, 2026-10-09).

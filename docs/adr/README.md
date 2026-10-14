@@ -28,7 +28,7 @@
 | [0024](0024-moving-money-between-funds.md) | Moving money between a group's funds: decided like a payout, booked as two mirrored single-fund entries; the owners keep their money; never reversed, moved back instead | **Accepted** (Harry, 2026-10-05); built |
 | [0025](0025-moving-a-pay-in-to-the-right-fund.md) | A pay-in booked in the wrong fund is moved to the right one by a corrector: two entries, the owner keeps it, arrears follow the line | Proposed (Claude, 2026-10-06); one corrector confirmed by Harry (2026-10-06); built |
 | [0026](0026-fund-codes-and-closed-funds.md) | A fund code is its fund's for good (3–6 letters); an unclear code raises an alert; a closed fund takes no money (PostgreSQL); the default fund is custody's; operators set up groups, members and funds | **Accepted** (Harry, 2026-10-06) |
-| [0027](0027-the-application-does-not-own-its-tables.md) | The application role owns no table: a separate owner runs migrations; the runtime role gets SELECT/INSERT on append-only tables, UPDATE only where state changes, never DELETE | Proposed (Claude, 2026-10-09) |
+| [0027](0027-the-application-does-not-own-its-tables.md) | The application role owns no table: a separate owner runs migrations; the runtime role gets SELECT/INSERT on append-only tables, UPDATE only where state changes, never DELETE | Accepted (Harry, 2026-10-09) |
 
 All are **Proposed** until Harry accepts them. Harry's
 [foundational decisions](../architecture/foundational-decisions.md)
